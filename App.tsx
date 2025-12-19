@@ -1,0 +1,413 @@
+
+import React, { useState, useRef, useEffect } from 'react';
+import { TicketPreview } from './components/TicketPreview';
+import { TicketData } from './types';
+import { ASSETS, COLORS } from './constants';
+import html2canvas from 'html2canvas';
+import { GoogleGenAI } from "@google/genai";
+
+const App: React.FC = () => {
+  const [formData, setFormData] = useState<TicketData>({
+    saldo: '',
+    codigo: '',
+    phone: ''
+  });
+  const [showPreview, setShowPreview] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copying' | 'success' | 'error'>('idle');
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [extractedTexts, setExtractedTexts] = useState<string[]>([]);
+  
+  const ticketRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const formatWithCommas = (value: string) => {
+    const cleanValue = value.replace(/[^\d.]/g, '');
+    const parts = cleanValue.split('.');
+    if (parts.length > 2) return formData.saldo;
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join('.');
+  };
+
+  const handleGenerate = () => {
+    if (!formData.codigo.trim()) {
+      alert("Introduce el código");
+      return;
+    }
+    formatSaldoOnComplete();
+    setShowPreview(true);
+    setTimeout(() => {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }, 300);
+  };
+
+  const handleClear = () => {
+    setFormData(prev => ({
+      ...prev,
+      saldo: '',
+      codigo: ''
+    }));
+    setShowPreview(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    let processedValue = value;
+
+    if (name === 'codigo') {
+      processedValue = value.toLowerCase();
+    } else if (name === 'saldo') {
+      processedValue = formatWithCommas(value);
+    }
+
+    setFormData(prev => ({ ...prev, [name]: processedValue }));
+  };
+
+  const formatSaldoOnComplete = () => {
+    let value = formData.saldo.trim();
+    if (value === '') return;
+    
+    if (!value.includes('.')) {
+      value = value + '.00';
+    } else {
+      const parts = value.split('.');
+      if (parts[1].length === 0) value = value + '00';
+      else if (parts[1].length === 1) value = value + '0';
+    }
+    setFormData(prev => ({ ...prev, saldo: value }));
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (e.target.name === 'saldo') {
+      formatSaldoOnComplete();
+    }
+  };
+
+  const startCamera = async () => {
+    setIsCameraOpen(true);
+    setExtractedTexts([]);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error("Error accessing camera:", err);
+      alert("No se pudo acceder a la cámara. Por favor verifica los permisos.");
+      setIsCameraOpen(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+      tracks.forEach(track => track.stop());
+    }
+    setIsCameraOpen(false);
+  };
+
+  const captureAndExtract = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    
+    setIsScanning(true);
+    const context = canvasRef.current.getContext('2d');
+    const video = videoRef.current;
+    
+    canvasRef.current.width = video.videoWidth;
+    canvasRef.current.height = video.videoHeight;
+    context?.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+    
+    const base64Image = canvasRef.current.toDataURL('image/jpeg', 0.8).split(',')[1];
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: {
+          parts: [
+            { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
+            { text: "Extract all short text snippets, codes, or alphanumeric strings from this image. Return them as a simple list separated by newlines. No conversational text. If you see something that looks like a ticket code, put it first." }
+          ]
+        }
+      });
+
+      const text = response.text || "";
+      const results = text.split('\n').map(t => t.trim()).filter(t => t.length > 1);
+      setExtractedTexts(results);
+    } catch (err) {
+      console.error("OCR Error:", err);
+      alert("Error al procesar la imagen.");
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const selectCode = (text: string) => {
+    setFormData(prev => ({ ...prev, codigo: text.toLowerCase() }));
+    stopCamera();
+  };
+
+  const getTicketBlob = async (): Promise<Blob | null> => {
+    if (!ticketRef.current) return null;
+    try {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const canvas = await html2canvas(ticketRef.current, {
+        scale: 3,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+      return new Promise((resolve) => canvas.toBlob(resolve, 'image/png', 1.0));
+    } catch (e) {
+      console.error("Error capturando el ticket", e);
+      return null;
+    }
+  };
+
+  const handleDownload = async () => {
+    setIsProcessing(true);
+    const blob = await getTicketBlob();
+    if (blob) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Yoshi-Ticket-${formData.codigo}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+    setIsProcessing(false);
+  };
+
+  const handleSend = async () => {
+    if (!formData.phone) {
+      alert("Introduce un número de teléfono primero");
+      return;
+    }
+
+    setIsProcessing(true);
+    setCopyStatus('copying');
+    
+    const blob = await getTicketBlob();
+    const cleanPhone = formData.phone.replace(/\D/g, '');
+    
+    if (blob) {
+      try {
+        if (navigator.clipboard && navigator.clipboard.write) {
+          const item = new ClipboardItem({ 'image/png': blob });
+          await navigator.clipboard.write([item]);
+          setCopyStatus('success');
+          
+          setTimeout(() => {
+            const whatsappUrl = `https://wa.me/${cleanPhone}`;
+            window.open(whatsappUrl, '_blank');
+            setCopyStatus('idle');
+          }, 1000);
+        } else {
+          throw new Error("Copiado no soportado");
+        }
+      } catch (error) {
+        if (navigator.share) {
+          const file = new File([blob], `Yoshi-${formData.codigo}.png`, { type: 'image/png' });
+          try {
+            await navigator.share({
+              files: [file],
+              title: 'Ticket Yoshi Cash',
+            });
+          } catch (shareError) {
+            console.error('Error al compartir', shareError);
+          }
+        } else {
+          window.open(`https://wa.me/${cleanPhone}`, '_blank');
+        }
+        setCopyStatus('idle');
+      }
+    }
+    setIsProcessing(false);
+  };
+
+  return (
+    <div className="max-w-md mx-auto min-h-screen flex flex-col bg-gray-50 pb-20 px-4">
+      <header className="flex flex-col items-center py-10 text-center">
+        <img 
+          src={ASSETS.USER_LOGO} 
+          alt="Logo" 
+          className="h-24 w-24 object-contain mb-4 drop-shadow-md"
+        />
+        <h1 className="text-4xl font-extrabold text-gray-900 leading-tight font-title">
+          D-QR Yoshi
+        </h1>
+        <h2 className="text-xl font-bold mt-1 font-title" style={{ color: COLORS.PRIMARY }}>
+          Yoshi Cash
+        </h2>
+      </header>
+
+      <div className="space-y-6">
+        <div className="bg-white rounded-3xl p-7 shadow-xl shadow-[#bd004d]/10 border border-gray-100">
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-bold text-gray-500 mb-2 ml-1">Saldo (Opcional)</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                <input 
+                  type="text" 
+                  name="saldo"
+                  inputMode="decimal"
+                  value={formData.saldo}
+                  onChange={handleInputChange}
+                  onBlur={handleBlur}
+                  className="w-full pl-8 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:bg-white outline-none transition-all font-medium text-gray-800"
+                  style={{ '--tw-ring-color': COLORS.PRIMARY } as any}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-500 mb-2 ml-1">Código</label>
+              <div className="relative flex items-center">
+                <input 
+                  type="text" 
+                  name="codigo"
+                  value={formData.codigo}
+                  onChange={handleInputChange}
+                  className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:bg-white outline-none transition-all lowercase font-medium text-gray-800 pr-14"
+                  style={{ '--tw-ring-color': COLORS.PRIMARY } as any}
+                  placeholder="introduce el código"
+                />
+                <button 
+                  onClick={startCamera}
+                  className="absolute right-3 p-2 text-gray-400 hover:text-[#bd004d] transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={handleGenerate}
+                className="flex-grow py-4 text-white font-bold text-lg rounded-2xl shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                style={{ backgroundColor: COLORS.PRIMARY, boxShadow: `0 10px 15px -3px rgba(189, 0, 77, 0.2)` }}
+              >
+                <span className="font-title">Generar QR</span>
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zM13 3v8h8V3h-8zm6 6h-4V5h4v4zM13 13h2v2h-2v-2zm2 2h2v2h-2v-2zm0-2h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2zm0 2h2v2h-2v-2zm-6 4h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2z"/>
+                </svg>
+              </button>
+              <button 
+                onClick={handleClear}
+                className="px-6 py-4 bg-gray-100 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-2xl transition-all flex items-center justify-center"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* MODAL CÁMARA */}
+        {isCameraOpen && (
+          <div className="fixed inset-0 z-50 bg-black flex flex-col">
+            <div className="relative flex-1 flex items-center justify-center">
+              <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+              <div className="absolute inset-0 border-[40px] border-black/40 flex items-center justify-center pointer-events-none">
+                <div className="w-64 h-24 border-2 border-white/50 rounded-xl relative">
+                  <div className="absolute -top-1 -left-1 w-4 h-4 border-t-4 border-l-4 border-white"></div>
+                  <div className="absolute -top-1 -right-1 w-4 h-4 border-t-4 border-r-4 border-white"></div>
+                  <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-4 border-l-4 border-white"></div>
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-4 border-r-4 border-white"></div>
+                </div>
+              </div>
+              <button onClick={stopCamera} className="absolute top-6 right-6 p-2 bg-white/20 backdrop-blur-md rounded-full text-white">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="bg-white p-6 rounded-t-[40px] -mt-10 relative z-10 min-h-[300px] flex flex-col items-center">
+              <div className="w-12 h-1 bg-gray-200 rounded-full mb-6"></div>
+              {!isScanning && extractedTexts.length === 0 && (
+                <button onClick={captureAndExtract} className="w-20 h-20 rounded-full border-4 border-[#bd004d]/10 flex items-center justify-center bg-[#bd004d] text-white shadow-xl shadow-[#bd004d]/30 active:scale-95 transition-all">
+                  <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24"><path d="M12 9a3 3 0 100 6 3 3 0 000-6z" /><path fillRule="evenodd" d="M5.93 5.417C7.625 3.167 10.334 2 12 2c1.667 0 4.375 1.167 6.07 3.417.433.574.808 1.218 1.116 1.916.19.43.35.88.48 1.347h.334A2 2 0 0122 10.667v8a2 2 0 01-2 2H4a2 2 0 01-2-2v-8a2 2 0 012-2h.334c.13-.466.29-.917.48-1.347.308-.698.683-1.342 1.116-1.916zM17 13a5 5 0 11-10 0 5 5 0 0110 0z" clipRule="evenodd" /></svg>
+                </button>
+              )}
+              {isScanning && (
+                <div className="flex flex-col items-center gap-4 py-8">
+                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#bd004d] border-t-transparent"></div>
+                  <p className="font-bold text-gray-500 animate-pulse">Analizando imagen...</p>
+                </div>
+              )}
+              {extractedTexts.length > 0 && (
+                <div className="w-full space-y-4">
+                  <p className="text-xs font-black text-gray-400 uppercase tracking-widest text-center">Selecciona el código detectado</p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {extractedTexts.map((txt, i) => (
+                      <button key={i} onClick={() => selectCode(txt)} className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-gray-800 font-bold hover:bg-[#bd004d]/5 hover:border-[#bd004d]/40 transition-all text-sm">{txt}</button>
+                    ))}
+                  </div>
+                  <button onClick={() => setExtractedTexts([])} className="w-full text-center text-sm font-bold text-[#bd004d] py-2">Volver a intentar</button>
+                </div>
+              )}
+              <canvas ref={canvasRef} className="hidden" />
+            </div>
+          </div>
+        )}
+
+        {/* VISTA PREVIA */}
+        {showPreview && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-700 mt-8">
+            <div className="text-center">
+               <h3 className="text-[10px] font-black text-gray-300 uppercase tracking-[0.4em]">Vista Previa del Ticket</h3>
+            </div>
+            <TicketPreview data={formData} innerRef={ticketRef} />
+            <div className="bg-white p-8 rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 space-y-6">
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">Enviar a WhatsApp Directo</label>
+                <input 
+                  type="tel" 
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-gray-800"
+                  placeholder="Ej: 521..."
+                />
+                {copyStatus === 'success' && (
+                  <p className="text-[10px] text-green-600 font-bold mt-2 animate-pulse flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>
+                    ¡Ticket copiado! Pégalo en el chat.
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={handleSend}
+                  disabled={isProcessing}
+                  className="w-full py-4 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:opacity-95 shadow-md active:scale-[0.98] disabled:opacity-50"
+                  style={{ backgroundColor: COLORS.PRIMARY }}
+                >
+                  {isProcessing ? "Preparando Ticket..." : "Enviar a WhatsApp"}
+                </button>
+                <div className="grid grid-cols-2 gap-3">
+                   <button onClick={handleDownload} disabled={isProcessing} className="py-4 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg" style={{ backgroundColor: COLORS.PRIMARY }}>descargar</button>
+                   <button onClick={handleDownload} className="py-4 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg" style={{ backgroundColor: COLORS.PRIMARY }}>compartir</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default App;

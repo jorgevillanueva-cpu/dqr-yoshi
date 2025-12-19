@@ -1,0 +1,21 @@
+{
+  "name": "D-QR Yoshi",
+  "short_name": "DQR Yoshi",
+  "description": "Herramienta profesional para la generación de tickets digitales con QR personalizados para Yoshi Cash.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#bd004d",
+  "icons": [
+    {
+      "src": "https://yoshicash.com/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon",
+      "purpose": "any maskable"
+    }
+  ],
+  "orientation": "portrait",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
