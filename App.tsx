@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { TicketPreview } from './components/TicketPreview';
+import { TicketPreview, YoshiLogo } from './components/TicketPreview';
 import { TicketData } from './types';
 import { ASSETS, COLORS } from './constants';
 import html2canvas from 'html2canvas';
@@ -39,7 +39,10 @@ const App: React.FC = () => {
     formatSaldoOnComplete();
     setShowPreview(true);
     setTimeout(() => {
-      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      const rootEl = document.getElementById('root');
+      if (rootEl) {
+        rootEl.scrollTo({ top: rootEl.scrollHeight, behavior: 'smooth' });
+      }
     }, 300);
   };
 
@@ -47,10 +50,14 @@ const App: React.FC = () => {
     setFormData(prev => ({
       ...prev,
       saldo: '',
-      codigo: ''
+      codigo: '',
+      phone: ''
     }));
     setShowPreview(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const rootEl = document.getElementById('root');
+    if (rootEl) {
+      rootEl.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,6 +83,7 @@ const App: React.FC = () => {
       const parts = value.split('.');
       if (parts[1].length === 0) value = value + '00';
       else if (parts[1].length === 1) value = value + '0';
+      else if (parts[1].length > 2) value = parts[0] + '.' + parts[1].substring(0, 2);
     }
     setFormData(prev => ({ ...prev, saldo: value }));
   };
@@ -131,7 +139,7 @@ const App: React.FC = () => {
         contents: {
           parts: [
             { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
-            { text: "Extract all short text snippets, codes, or alphanumeric strings from this image. Return them as a simple list separated by newlines. No conversational text. If you see something that looks like a ticket code, put it first." }
+            { text: "Extrae cualquier código alfanumérico corto o texto que parezca un ID de ticket de esta imagen. Devuelve solo una lista de strings separados por saltos de línea." }
           ]
         }
       });
@@ -155,12 +163,12 @@ const App: React.FC = () => {
   const getTicketBlob = async (): Promise<Blob | null> => {
     if (!ticketRef.current) return null;
     try {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 300));
       const canvas = await html2canvas(ticketRef.current, {
         scale: 3,
         useCORS: true,
         allowTaint: false,
-        backgroundColor: '#ffffff',
+        backgroundColor: '#F9FAFB',
         logging: false,
       });
       return new Promise((resolve) => canvas.toBlob(resolve, 'image/png', 1.0));
@@ -172,18 +180,48 @@ const App: React.FC = () => {
 
   const handleDownload = async () => {
     setIsProcessing(true);
-    const blob = await getTicketBlob();
-    if (blob) {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Yoshi-Ticket-${formData.codigo}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+    try {
+      const blob = await getTicketBlob();
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Yoshi-Ticket-${formData.codigo || 'cash'}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsProcessing(false);
     }
-    setIsProcessing(false);
+  };
+
+  const handleShare = async () => {
+    setIsProcessing(true);
+    try {
+      const blob = await getTicketBlob();
+      if (blob) {
+        const file = new File([blob], `Yoshi-Ticket-${formData.codigo || 'cash'}.png`, { type: 'image/png' });
+        
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: 'Ticket Yoshi Cash',
+            text: 'Aquí tienes tu ticket de Yoshi Cash'
+          });
+        } else {
+          handleDownload();
+          alert("Tu dispositivo no soporta compartir archivos. El ticket se ha descargado.");
+        }
+      }
+    } catch (err) {
+      console.error("Error compartiendo:", err);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleSend = async () => {
@@ -209,25 +247,16 @@ const App: React.FC = () => {
             const whatsappUrl = `https://wa.me/${cleanPhone}`;
             window.open(whatsappUrl, '_blank');
             setCopyStatus('idle');
+            setFormData(prev => ({ ...prev, phone: '' }));
           }, 1000);
         } else {
-          throw new Error("Copiado no soportado");
+          throw new Error("Clipboard API not supported");
         }
       } catch (error) {
-        if (navigator.share) {
-          const file = new File([blob], `Yoshi-${formData.codigo}.png`, { type: 'image/png' });
-          try {
-            await navigator.share({
-              files: [file],
-              title: 'Ticket Yoshi Cash',
-            });
-          } catch (shareError) {
-            console.error('Error al compartir', shareError);
-          }
-        } else {
-          window.open(`https://wa.me/${cleanPhone}`, '_blank');
-        }
+        const whatsappUrl = `https://wa.me/${cleanPhone}`;
+        window.open(whatsappUrl, '_blank');
         setCopyStatus('idle');
+        setFormData(prev => ({ ...prev, phone: '' }));
       }
     }
     setIsProcessing(false);
@@ -236,13 +265,11 @@ const App: React.FC = () => {
   return (
     <div className="max-w-md mx-auto min-h-screen flex flex-col bg-gray-50 pb-20 px-4">
       <header className="flex flex-col items-center py-10 text-center">
-        <img 
-          src={ASSETS.USER_LOGO} 
-          alt="Logo" 
-          className="h-24 w-24 object-contain mb-4 drop-shadow-md"
-        />
+        <div className="mb-4 drop-shadow-md">
+          <YoshiLogo className="h-24 w-24" />
+        </div>
         <h1 className="text-4xl font-extrabold text-gray-900 leading-tight font-title">
-          D-QR Yoshi
+          Digitalizador QR
         </h1>
         <h2 className="text-xl font-bold mt-1 font-title" style={{ color: COLORS.PRIMARY }}>
           Yoshi Cash
@@ -317,7 +344,6 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* MODAL CÁMARA */}
         {isCameraOpen && (
           <div className="fixed inset-0 z-50 bg-black flex flex-col">
             <div className="relative flex-1 flex items-center justify-center">
@@ -363,7 +389,6 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* VISTA PREVIA */}
         {showPreview && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-700 mt-8">
             <div className="text-center">
@@ -384,7 +409,7 @@ const App: React.FC = () => {
                 {copyStatus === 'success' && (
                   <p className="text-[10px] text-green-600 font-bold mt-2 animate-pulse flex items-center gap-1">
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>
-                    ¡Ticket copiado! Pégalo en el chat.
+                    ¡Ticket copiado! Pégalo en el chat de WhatsApp.
                   </p>
                 )}
               </div>
@@ -398,8 +423,22 @@ const App: React.FC = () => {
                   {isProcessing ? "Preparando Ticket..." : "Enviar a WhatsApp"}
                 </button>
                 <div className="grid grid-cols-2 gap-3">
-                   <button onClick={handleDownload} disabled={isProcessing} className="py-4 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg" style={{ backgroundColor: COLORS.PRIMARY }}>descargar</button>
-                   <button onClick={handleDownload} className="py-4 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg" style={{ backgroundColor: COLORS.PRIMARY }}>compartir</button>
+                   <button 
+                    onClick={handleDownload} 
+                    disabled={isProcessing} 
+                    className="py-4 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50" 
+                    style={{ backgroundColor: COLORS.PRIMARY }}
+                   >
+                    descargar
+                   </button>
+                   <button 
+                    onClick={handleShare} 
+                    disabled={isProcessing}
+                    className="py-4 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50" 
+                    style={{ backgroundColor: COLORS.PRIMARY }}
+                   >
+                    compartir
+                   </button>
                 </div>
               </div>
             </div>
