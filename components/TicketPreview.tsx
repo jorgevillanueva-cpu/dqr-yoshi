@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { TicketData } from '../types';
@@ -9,6 +8,7 @@ interface TicketPreviewProps {
   innerRef: React.RefObject<HTMLDivElement>;
 }
 
+// Logo SVG restaurado a la versión original de tres trazos
 export const YoshiLogo: React.FC<{ className?: string; color?: string }> = ({ className, color = COLORS.PRIMARY }) => (
   <svg className={className} viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
     <g fill="none" stroke={color} strokeWidth="38" strokeLinecap="round" strokeLinejoin="round">
@@ -30,6 +30,7 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
         backgroundColor: '#F9FAFB' 
       }}
     >
+      {/* Cabecera con Logo */}
       <div className="relative h-[12%] w-full bg-white flex flex-col items-center justify-center border-b-2 border-dashed border-gray-100">
         <div className="flex flex-col items-center">
           <YoshiLogo className="h-20 w-20" />
@@ -39,6 +40,7 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
         </div>
       </div>
 
+      {/* Sección de Saldo */}
       {data.saldo && data.saldo.trim() !== '' && (
         <div className="relative px-8 pt-8 pb-4">
           <div 
@@ -51,11 +53,11 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
               ))}
             </div>
             
-            <div className="relative z-10 flex flex-col items-center">
-              <span className="text-[11px] font-bold uppercase tracking-[0.3em] opacity-80 mb-1">
+            <div className="relative z-10 flex flex-col items-center justify-center">
+              <span className="text-[11px] font-bold uppercase tracking-[0.3em] opacity-80 mt-0 -mb-1">
                 Saldo Disponible
               </span>
-              <span className="text-5xl font-black tracking-tighter">
+              <span className="text-[42px] font-medium tracking-tighter -mt-5">
                 ${data.saldo}
               </span>
             </div>
@@ -63,12 +65,13 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
         </div>
       )}
 
+      {/* Cuerpo del Ticket con Código QR */}
       <div className="flex-1 flex flex-col items-center justify-center pt-4 pb-12 px-10 relative">
         <div className="absolute -left-5 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-gray-50 border border-gray-100 shadow-inner"></div>
         <div className="absolute -right-5 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-gray-50 border border-gray-100 shadow-inner"></div>
 
-        <p className="text-[22px] font-bold text-gray-400 text-center mb-8 max-w-[90%] leading-snug tracking-tight">
-          Presenta este código en caja para completar tu pago
+        <p className="text-[15px] font-medium text-gray-400 text-center mb-8 max-w-[90%] leading-snug tracking-tight">
+          Usa este ticket para pagar presentando el código QR
         </p>
 
         <div className="w-full aspect-square bg-white rounded-[40px] shadow-2xl border-2 border-gray-50 p-10 flex items-center justify-center relative overflow-hidden group">
@@ -80,21 +83,22 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
             value={data.codigo || 'yoshi'} 
             size={260}
             level="H"
-            fgColor={COLORS.SECONDARY}
+            fgColor="#000000"
             bgColor="transparent"
             includeMargin={false}
           />
         </div>
 
-        <p className="text-[18px] font-bold text-gray-400 text-center mt-10 max-w-[95%] leading-tight tracking-tight">
-          Consulta términos y condiciones en:<br/>
-          <span className="text-[16px] text-[#bd004d] font-black uppercase tracking-widest">yoshicash.com</span>
+        <p className="text-[15px] font-medium text-gray-400 text-center mt-10 max-w-[95%] leading-tight tracking-tight">
+          Solicita tu saldo remanente desde<br/>
+          <span className="text-[14px] text-[#bd004d] font-bold lowercase tracking-wider">https://yoshicash.com/refunds</span>
         </p>
       </div>
 
+      {/* Pie de Ticket con Código Moderno y Discreto */}
       <div className="h-[14%] bg-white flex flex-col items-center justify-center px-8 border-t-2 border-dashed border-gray-100 pb-4">
         <div className="text-center w-full">
-          <p className="text-3xl font-black text-gray-900 break-all lowercase leading-tight tracking-[0.15em]">
+          <p className="text-lg font-medium text-gray-500 break-all lowercase leading-tight tracking-[0.25em] font-mono">
             {data.codigo || '---'}
           </p>
         </div>
