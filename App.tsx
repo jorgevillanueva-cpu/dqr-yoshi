@@ -26,11 +26,9 @@ const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    // Detectar iOS para instrucciones personalizadas
     const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     setIsIOS(ios);
 
-    // Escuchar evento de instalación (Android/Chrome)
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -38,7 +36,6 @@ const App: React.FC = () => {
 
     window.addEventListener('appinstalled', () => {
       setDeferredPrompt(null);
-      console.log('App instalada con éxito');
     });
   }, []);
 
@@ -75,12 +72,11 @@ const App: React.FC = () => {
   };
 
   const handleClear = () => {
-    setFormData(prev => ({
-      ...prev,
+    setFormData({
       saldo: '',
       codigo: '',
       phone: ''
-    }));
+    });
     setShowPreview(false);
     const rootEl = document.getElementById('root');
     if (rootEl) {
@@ -127,14 +123,15 @@ const App: React.FC = () => {
     setExtractedTexts([]);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } 
       });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(e => console.error("Auto-play error:", e));
       }
     } catch (err) {
       console.error("Error accessing camera:", err);
-      alert("No se pudo acceder a la cámara. Por favor verifica los permisos.");
+      alert("No se pudo acceder a la cámara. Verifica los permisos de tu dispositivo.");
       setIsCameraOpen(false);
     }
   };
@@ -150,9 +147,14 @@ const App: React.FC = () => {
   const captureAndExtract = async () => {
     if (!videoRef.current || !canvasRef.current) return;
     
+    const video = videoRef.current;
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      alert("La cámara se está iniciando. Reintenta en un segundo.");
+      return;
+    }
+
     setIsScanning(true);
     const context = canvasRef.current.getContext('2d');
-    const video = videoRef.current;
     
     canvasRef.current.width = video.videoWidth;
     canvasRef.current.height = video.videoHeight;
@@ -161,23 +163,36 @@ const App: React.FC = () => {
     const base64Image = canvasRef.current.toDataURL('image/jpeg', 0.8).split(',')[1];
 
     try {
+      if (!process.env.API_KEY) {
+        throw new Error("Clave de API no disponible en el entorno.");
+      }
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: {
+        contents: [{
           parts: [
             { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
-            { text: "Extrae cualquier código alfanumérico corto o texto que parezca un ID de ticket de esta imagen. Devuelve solo una lista de strings separados por saltos de línea." }
+            { text: "Eres un experto en OCR para tickets de prepago. Localiza el ID del ticket o código de barras alfanumérico. Devuelve solo los códigos detectados de más de 4 caracteres, uno por línea, sin texto adicional." }
           ]
-        }
+        }]
       });
 
-      const text = response.text || "";
-      const results = text.split('\n').map(t => t.trim()).filter(t => t.length > 1);
+      const textOutput = response.text;
+      if (!textOutput || textOutput.trim() === "") {
+        throw new Error("No se pudo detectar ningún texto legible.");
+      }
+
+      const results = textOutput.split('\n')
+        .map(t => t.trim())
+        .filter(t => t.length > 3 && t.length < 30);
+      
       setExtractedTexts(results);
-    } catch (err) {
-      console.error("OCR Error:", err);
-      alert("Error al procesar la imagen.");
+      if (results.length === 0) {
+        alert("No se detectó el código. Asegúrate de que el ticket esté bien iluminado y enfocado.");
+      }
+    } catch (err: any) {
+      console.error("Error OCR:", err);
+      alert(`Error al procesar: ${err.message || 'Error de conexión con el servidor'}`);
     } finally {
       setIsScanning(false);
     }
@@ -214,7 +229,7 @@ const App: React.FC = () => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `Yoshi-Ticket-${formData.codigo || 'cash'}.png`;
+        a.download = `Yoshi-${formData.codigo || 'ticket'}.png`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -232,17 +247,15 @@ const App: React.FC = () => {
     try {
       const blob = await getTicketBlob();
       if (blob) {
-        const file = new File([blob], `Yoshi-Ticket-${formData.codigo || 'cash'}.png`, { type: 'image/png' });
+        const file = new File([blob], `Ticket-${formData.codigo || 'yoshi'}.png`, { type: 'image/png' });
         
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({
             files: [file],
             title: 'Ticket Yoshi Cash',
-            text: 'Aquí tienes tu ticket de Yoshi Cash'
           });
         } else {
           handleDownload();
-          alert("Tu dispositivo no soporta compartir directamente. El ticket se ha descargado automáticamente.");
         }
       }
     } catch (err) {
@@ -254,7 +267,7 @@ const App: React.FC = () => {
 
   const handleSend = async () => {
     if (!formData.phone) {
-      alert("Introduce un número de teléfono primero");
+      alert("Introduce un número de teléfono");
       return;
     }
 
@@ -272,19 +285,14 @@ const App: React.FC = () => {
           setCopyStatus('success');
           
           setTimeout(() => {
-            const whatsappUrl = `https://wa.me/${cleanPhone}`;
-            window.open(whatsappUrl, '_blank');
+            window.open(`https://wa.me/${cleanPhone}`, '_blank');
             setCopyStatus('idle');
-            setFormData(prev => ({ ...prev, phone: '' }));
           }, 1000);
         } else {
-          throw new Error("Clipboard API not supported");
+          window.open(`https://wa.me/${cleanPhone}`, '_blank');
         }
       } catch (error) {
-        const whatsappUrl = `https://wa.me/${cleanPhone}`;
-        window.open(whatsappUrl, '_blank');
-        setCopyStatus('idle');
-        setFormData(prev => ({ ...prev, phone: '' }));
+        window.open(`https://wa.me/${cleanPhone}`, '_blank');
       }
     }
     setIsProcessing(false);
@@ -292,28 +300,18 @@ const App: React.FC = () => {
 
   return (
     <div className="max-w-md mx-auto min-h-screen flex flex-col bg-gray-50 pb-20 px-4">
-      {/* Aviso de Instalación PWA */}
       {deferredPrompt && (
         <div className="mt-4 bg-[#bd004d]/10 border border-[#bd004d]/20 p-4 rounded-2xl flex items-center justify-between animate-in fade-in zoom-in duration-500">
           <div className="flex items-center gap-3">
             <YoshiLogo className="w-8 h-8" />
-            <p className="text-xs font-bold text-[#bd004d]">Instalar Yoshi Cash en el escritorio</p>
+            <p className="text-xs font-bold text-[#bd004d]">Instalar Yoshi App</p>
           </div>
           <button 
             onClick={handleInstallClick}
-            className="bg-[#bd004d] text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl shadow-lg"
+            className="bg-[#bd004d] text-white text-[10px] font-black px-4 py-2 rounded-xl shadow-lg"
           >
-            Descargar
+            Instalar
           </button>
-        </div>
-      )}
-
-      {/* Fix: Explicitly cast window.navigator to any for the non-standard 'standalone' property used on iOS */}
-      {isIOS && !(window.navigator as any).standalone && (
-        <div className="mt-4 bg-white border border-gray-100 p-4 rounded-2xl text-center shadow-sm">
-          <p className="text-[10px] font-bold text-gray-500">
-            Para instalar: Pulsa <span className="text-[#bd004d] font-black">Compartir</span> y luego <span className="text-[#bd004d] font-black">"Añadir a pantalla de inicio"</span>
-          </p>
         </div>
       )}
 
@@ -321,12 +319,8 @@ const App: React.FC = () => {
         <div className="mb-4 drop-shadow-md">
           <YoshiLogo className="h-24 w-24" />
         </div>
-        <h1 className="text-4xl font-extrabold text-gray-900 leading-tight font-title">
-          Digitalizador QR
-        </h1>
-        <h2 className="text-xl font-bold mt-1 font-title" style={{ color: COLORS.PRIMARY }}>
-          Yoshi Cash
-        </h2>
+        <h1 className="text-4xl font-extrabold text-gray-900 leading-tight font-title">Digitalizador QR</h1>
+        <h2 className="text-xl font-bold mt-1 font-title" style={{ color: COLORS.PRIMARY }}>Yoshi Cash</h2>
       </header>
 
       <div className="space-y-6">
@@ -351,7 +345,7 @@ const App: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-500 mb-2 ml-1">Código</label>
+              <label className="block text-sm font-bold text-gray-500 mb-2 ml-1">Código del Ticket</label>
               <div className="relative flex items-center">
                 <input 
                   type="text" 
@@ -377,13 +371,10 @@ const App: React.FC = () => {
             <div className="flex gap-3">
               <button 
                 onClick={handleGenerate}
-                className="flex-grow py-4 text-white font-bold text-lg rounded-2xl shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-3"
-                style={{ backgroundColor: COLORS.PRIMARY, boxShadow: `0 10px 15px -3px rgba(189, 0, 77, 0.2)` }}
+                className="flex-grow py-4 text-white font-bold text-lg rounded-2xl shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-3 font-title"
+                style={{ backgroundColor: COLORS.PRIMARY }}
               >
-                <span className="font-title">Generar QR</span>
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zM13 3v8h8V3h-8zm6 6h-4V5h4v4zM13 13h2v2h-2v-2zm2 2h2v2h-2v-2zm0-2h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2zm0 2h2v2h-2v-2zm-6 4h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2z"/>
-                </svg>
+                Generar QR
               </button>
               <button 
                 onClick={handleClear}
@@ -400,14 +391,15 @@ const App: React.FC = () => {
         {isCameraOpen && (
           <div className="fixed inset-0 z-50 bg-black flex flex-col">
             <div className="relative flex-1 flex items-center justify-center">
-              <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                muted 
+                className="w-full h-full object-cover" 
+              />
               <div className="absolute inset-0 border-[40px] border-black/40 flex items-center justify-center pointer-events-none">
-                <div className="w-64 h-24 border-2 border-white/50 rounded-xl relative">
-                  <div className="absolute -top-1 -left-1 w-4 h-4 border-t-4 border-l-4 border-white"></div>
-                  <div className="absolute -top-1 -right-1 w-4 h-4 border-t-4 border-r-4 border-white"></div>
-                  <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-4 border-l-4 border-white"></div>
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-4 border-r-4 border-white"></div>
-                </div>
+                <div className="w-64 h-24 border-2 border-white/50 rounded-xl"></div>
               </div>
               <button onClick={stopCamera} className="absolute top-6 right-6 p-2 bg-white/20 backdrop-blur-md rounded-full text-white">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -416,25 +408,33 @@ const App: React.FC = () => {
             <div className="bg-white p-6 rounded-t-[40px] -mt-10 relative z-10 min-h-[300px] flex flex-col items-center">
               <div className="w-12 h-1 bg-gray-200 rounded-full mb-6"></div>
               {!isScanning && extractedTexts.length === 0 && (
-                <button onClick={captureAndExtract} className="w-20 h-20 rounded-full border-4 border-[#bd004d]/10 flex items-center justify-center bg-[#bd004d] text-white shadow-xl shadow-[#bd004d]/30 active:scale-95 transition-all">
+                <button 
+                  onClick={captureAndExtract} 
+                  className="w-20 h-20 rounded-full bg-[#bd004d] text-white shadow-xl shadow-[#bd004d]/30 active:scale-95 transition-all flex items-center justify-center"
+                >
                   <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24"><path d="M12 9a3 3 0 100 6 3 3 0 000-6z" /><path fillRule="evenodd" d="M5.93 5.417C7.625 3.167 10.334 2 12 2c1.667 0 4.375 1.167 6.07 3.417.433.574.808 1.218 1.116 1.916.19.43.35.88.48 1.347h.334A2 2 0 0122 10.667v8a2 2 0 01-2 2H4a2 2 0 01-2-2v-8a2 2 0 012-2h.334c.13-.466.29-.917.48-1.347.308-.698.683-1.342 1.116-1.916zM17 13a5 5 0 11-10 0 5 5 0 0110 0z" clipRule="evenodd" /></svg>
                 </button>
               )}
               {isScanning && (
                 <div className="flex flex-col items-center gap-4 py-8">
                   <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#bd004d] border-t-transparent"></div>
-                  <p className="font-bold text-gray-500 animate-pulse">Analizando imagen...</p>
+                  <p className="font-bold text-gray-500 animate-pulse">Analizando...</p>
                 </div>
               )}
               {extractedTexts.length > 0 && (
                 <div className="w-full space-y-4">
-                  <p className="text-xs font-black text-gray-400 uppercase tracking-widest text-center">Selecciona el código detectado</p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase text-center">Toca el código detectado</p>
                   <div className="flex flex-wrap justify-center gap-2">
                     {extractedTexts.map((txt, i) => (
-                      <button key={i} onClick={() => selectCode(txt)} className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-gray-800 font-bold hover:bg-[#bd004d]/5 hover:border-[#bd004d]/40 transition-all text-sm">{txt}</button>
+                      <button 
+                        key={i} 
+                        onClick={() => selectCode(txt)} 
+                        className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-gray-800 font-bold hover:bg-[#bd004d]/5 hover:border-[#bd004d]/40 transition-all uppercase text-sm"
+                      >
+                        {txt}
+                      </button>
                     ))}
                   </div>
-                  <button onClick={() => setExtractedTexts([])} className="w-full text-center text-sm font-bold text-[#bd004d] py-2">Volver a intentar</button>
                 </div>
               )}
               <canvas ref={canvasRef} className="hidden" />
@@ -443,14 +443,11 @@ const App: React.FC = () => {
         )}
 
         {showPreview && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-700 mt-8">
-            <div className="text-center">
-               <h3 className="text-[10px] font-black text-gray-300 uppercase tracking-[0.4em]">Vista Previa del Ticket</h3>
-            </div>
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-700 mt-8 pb-10">
             <TicketPreview data={formData} innerRef={ticketRef} />
-            <div className="bg-white p-8 rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 space-y-6">
+            <div className="bg-white p-8 rounded-3xl shadow-xl border border-gray-100 space-y-6">
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">Enviar a WhatsApp Directo</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase mb-3 block">Enviar a WhatsApp</label>
                 <input 
                   type="tel" 
                   name="phone"
@@ -460,28 +457,25 @@ const App: React.FC = () => {
                   placeholder="Ej: 521..."
                 />
                 {copyStatus === 'success' && (
-                  <p className="text-[10px] text-green-600 font-bold mt-2 animate-pulse flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>
-                    ¡Ticket copiado! Pégalo en el chat de WhatsApp.
-                  </p>
+                  <p className="text-[10px] text-green-600 font-bold mt-2 animate-pulse">¡Ticket copiado! Abre WhatsApp y pega la imagen.</p>
                 )}
               </div>
               <div className="flex flex-col gap-3">
                 <button 
                   onClick={handleSend}
                   disabled={isProcessing}
-                  className="w-full py-4 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:opacity-95 shadow-md active:scale-[0.98] disabled:opacity-50"
+                  className="w-full py-4 text-white font-bold rounded-2xl shadow-md disabled:opacity-50"
                   style={{ backgroundColor: COLORS.PRIMARY }}
                 >
-                  {isProcessing ? "Preparando Ticket..." : "Enviar a WhatsApp"}
+                  {isProcessing ? "Procesando..." : "Copiar y abrir WhatsApp"}
                 </button>
                 <button 
                   onClick={handleShare} 
                   disabled={isProcessing}
-                  className="w-full py-4 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50" 
+                  className="w-full py-4 text-white font-bold rounded-2xl shadow-lg disabled:opacity-50" 
                   style={{ backgroundColor: COLORS.PRIMARY }}
                 >
-                  compartir ticket
+                  Compartir Ticket
                 </button>
               </div>
             </div>

@@ -67,12 +67,16 @@
 <body class="bg-gray-50">
     <div id="root"></div>
     <script>
-      // Registro simple y robusto del Service Worker
+      // Registro resiliente del Service Worker
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('SW registrado:', reg.scope))
-            .catch(err => console.error('Error SW:', err));
+          // Usamos una ruta relativa simple para evitar errores 'Invalid URL'.
+          // Si el origen no coincide (común en sandboxes), el catch lo manejará sin romper la app.
+          navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('SW registrado con éxito:', reg.scope))
+            .catch(err => {
+              console.warn('Registro de Service Worker omitido (ambiente de desarrollo):', err.message);
+            });
         });
       }
     </script>
