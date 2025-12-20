@@ -99,7 +99,7 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
       {/* Pie de Ticket alaragado (Sección blanca final) */}
       <div className="h-[22%] bg-white flex flex-col items-center justify-start pt-10 px-8 border-t-2 border-dashed border-gray-100">
         <div className="text-center w-full mb-6">
-          <p className="text-lg font-medium text-gray-500 break-all lowercase leading-tight tracking-[0.25em] font-mono">
+          <p className="text-lg font-medium text-Black-500 break-all lowercase leading-tight tracking-[0.25em] font-mono">
             {data.codigo || '---'}
           </p>
         </div>
