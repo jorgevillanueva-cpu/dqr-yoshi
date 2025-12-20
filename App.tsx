@@ -18,10 +18,38 @@ const App: React.FC = () => {
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [extractedTexts, setExtractedTexts] = useState<string[]>([]);
-  
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isIOS, setIsIOS] = useState(false);
+
   const ticketRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    // Detectar iOS para instrucciones personalizadas
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIOS(ios);
+
+    // Escuchar evento de instalación (Android/Chrome)
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    });
+
+    window.addEventListener('appinstalled', () => {
+      setDeferredPrompt(null);
+      console.log('App instalada con éxito');
+    });
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
 
   const formatWithCommas = (value: string) => {
     const cleanValue = value.replace(/[^\d.]/g, '');
@@ -214,7 +242,7 @@ const App: React.FC = () => {
           });
         } else {
           handleDownload();
-          alert("Tu dispositivo no soporta compartir archivos. El ticket se ha descargado.");
+          alert("Tu dispositivo no soporta compartir directamente. El ticket se ha descargado automáticamente.");
         }
       }
     } catch (err) {
@@ -264,6 +292,31 @@ const App: React.FC = () => {
 
   return (
     <div className="max-w-md mx-auto min-h-screen flex flex-col bg-gray-50 pb-20 px-4">
+      {/* Aviso de Instalación PWA */}
+      {deferredPrompt && (
+        <div className="mt-4 bg-[#bd004d]/10 border border-[#bd004d]/20 p-4 rounded-2xl flex items-center justify-between animate-in fade-in zoom-in duration-500">
+          <div className="flex items-center gap-3">
+            <YoshiLogo className="w-8 h-8" />
+            <p className="text-xs font-bold text-[#bd004d]">Instalar Yoshi Cash en el escritorio</p>
+          </div>
+          <button 
+            onClick={handleInstallClick}
+            className="bg-[#bd004d] text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl shadow-lg"
+          >
+            Descargar
+          </button>
+        </div>
+      )}
+
+      {/* Fix: Explicitly cast window.navigator to any for the non-standard 'standalone' property used on iOS */}
+      {isIOS && !(window.navigator as any).standalone && (
+        <div className="mt-4 bg-white border border-gray-100 p-4 rounded-2xl text-center shadow-sm">
+          <p className="text-[10px] font-bold text-gray-500">
+            Para instalar: Pulsa <span className="text-[#bd004d] font-black">Compartir</span> y luego <span className="text-[#bd004d] font-black">"Añadir a pantalla de inicio"</span>
+          </p>
+        </div>
+      )}
+
       <header className="flex flex-col items-center py-10 text-center">
         <div className="mb-4 drop-shadow-md">
           <YoshiLogo className="h-24 w-24" />
@@ -422,24 +475,14 @@ const App: React.FC = () => {
                 >
                   {isProcessing ? "Preparando Ticket..." : "Enviar a WhatsApp"}
                 </button>
-                <div className="grid grid-cols-2 gap-3">
-                   <button 
-                    onClick={handleDownload} 
-                    disabled={isProcessing} 
-                    className="py-4 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50" 
-                    style={{ backgroundColor: COLORS.PRIMARY }}
-                   >
-                    descargar
-                   </button>
-                   <button 
-                    onClick={handleShare} 
-                    disabled={isProcessing}
-                    className="py-4 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50" 
-                    style={{ backgroundColor: COLORS.PRIMARY }}
-                   >
-                    compartir
-                   </button>
-                </div>
+                <button 
+                  onClick={handleShare} 
+                  disabled={isProcessing}
+                  className="w-full py-4 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50" 
+                  style={{ backgroundColor: COLORS.PRIMARY }}
+                >
+                  compartir ticket
+                </button>
               </div>
             </div>
           </div>
