@@ -235,7 +235,7 @@ const App: React.FC = () => {
         }
       }
     } catch (e) {
-      alert("Error al compartir.");
+      alert("");
     } finally {
       setIsProcessing(false);
     }
@@ -299,7 +299,7 @@ const App: React.FC = () => {
             </div>
             
             <div>
-              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">Código Referencia</label>
+              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">Ingresa Código de Ticket</label>
               <div className="relative flex items-center">
                 <input 
                   type="text" 
