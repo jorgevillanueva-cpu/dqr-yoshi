@@ -71,18 +71,18 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
         <div className="absolute -left-5 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-gray-50 border border-gray-100 shadow-inner"></div>
         <div className="absolute -right-5 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-gray-50 border border-gray-100 shadow-inner"></div>
 
-        <p className="text-[15px] font-medium text-gray-400 text-center mb-8 max-w-[90%] leading-snug tracking-tight">
+        <p className="text-[20px] font-medium text-gray-400 text-center mb-8 max-w-[90%] leading-snug tracking-tight">
           Usa este ticket para pagar presentando el código QR
         </p>
 
-        <div className="w-full aspect-square bg-white rounded-[40px] shadow-2xl border-2 border-gray-50 p-10 flex items-center justify-center relative overflow-hidden group">
+        <div className="w-full aspect-square bg-white rounded-[50px] shadow-2xl border-2 border-gray-50 p-10 flex items-center justify-center relative overflow-hidden group">
           <div className="absolute inset-0 opacity-[0.03] flex items-center justify-center rotate-12">
              <YoshiLogo className="w-[120%]" />
           </div>
           
           <QRCodeSVG 
             value={data.codigo || 'yoshi'} 
-            size={260}
+            size={300}
             level="H"
             fgColor="#000000"
             bgColor="transparent"
@@ -90,9 +90,9 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
           />
         </div>
 
-        <p className="text-[15px] font-medium text-gray-400 text-center mt-10 max-w-[95%] leading-tight tracking-tight">
+        <p className="text-[20px] font-medium text-gray-400 text-center mt-10 max-w-[95%] leading-tight tracking-tight">
           Solicita tu saldo remanente desde<br/>
-          <span className="text-[14px] text-[#bd004d] font-bold lowercase tracking-wider">https://yoshicash.com/refunds</span>
+          <span className="text-[20px] text-[#bd004d] font-bold lowercase tracking-wider">https://yoshicash.com/refunds</span>
         </p>
       </div>
 
