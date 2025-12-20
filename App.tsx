@@ -31,37 +31,12 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') setDeferredPrompt(null);
-  };
-
   const formatWithCommas = (value: string) => {
     const cleanValue = value.replace(/[^\d.]/g, '');
     const parts = cleanValue.split('.');
     if (parts.length > 2) return formData.saldo;
     parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     return parts.join('.');
-  };
-
-  const handleGenerate = () => {
-    if (!formData.codigo.trim()) {
-      alert("Introduce el código del ticket");
-      return;
-    }
-    formatSaldoOnComplete();
-    setShowPreview(true);
-    setTimeout(() => {
-      document.getElementById('root')?.scrollTo({ top: document.getElementById('root')?.scrollHeight, behavior: 'smooth' });
-    }, 300);
-  };
-
-  const handleClear = () => {
-    setFormData({ saldo: '', codigo: '', phone: '' });
-    setShowPreview(false);
-    document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,8 +61,10 @@ const App: React.FC = () => {
   };
 
   const startCamera = async () => {
-    setIsCameraOpen(true);
+    setIsScanning(false);
     setExtractedTexts([]);
+    setIsCameraOpen(true);
+    
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
@@ -101,7 +78,7 @@ const App: React.FC = () => {
         videoRef.current.play();
       }
     } catch (err) {
-      alert("No se pudo activar la cámara. Revisa los permisos.");
+      alert("No se pudo activar la cámara. Revisa los permisos del navegador.");
       setIsCameraOpen(false);
     }
   };
@@ -111,11 +88,18 @@ const App: React.FC = () => {
       (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
     }
     setIsCameraOpen(false);
+    setIsScanning(false);
   };
 
   const captureAndExtract = async () => {
     if (!videoRef.current || !canvasRef.current) return;
     
+    const key = process.env.API_KEY;
+    if (!key || key === "undefined") {
+      alert("Error: La API Key no se ha detectado. Recuerda hacer 'REDEPLOY' en Vercel después de agregar la variable de entorno.");
+      return;
+    }
+
     setIsScanning(true);
     const context = canvasRef.current.getContext('2d');
     canvasRef.current.width = videoRef.current.videoWidth;
@@ -125,34 +109,29 @@ const App: React.FC = () => {
     const base64Image = canvasRef.current.toDataURL('image/jpeg', 0.8).split(',')[1];
 
     try {
-      // Inicialización dinámica para captar la API_KEY inyectada por Vercel
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-      
+      const ai = new GoogleGenAI({ apiKey: key });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: {
           parts: [
             { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
-            { text: "OCR: Extrae únicamente el código alfanumérico largo del ticket. Devuelve solo los códigos encontrados, uno por línea, sin texto extra." }
+            { text: "OCR: Extrae el código alfanumérico largo del ticket. Devuelve solo los códigos encontrados, uno por línea." }
           ]
         }
       });
 
-      const text = response.text || "";
-      const results = text.split('\n').map(t => t.trim()).filter(t => t.length > 3 && t.length < 32);
+      const results = (response.text || "")
+        .split('\n')
+        .map(t => t.trim())
+        .filter(t => t.length > 3 && t.length < 32);
 
       setExtractedTexts(results);
       if (results.length === 0) {
-        alert("No se encontró texto legible. Intenta acercar más la cámara.");
+        alert("No se detectó el código. Prueba acercando más el ticket o mejorando la luz.");
       }
     } catch (err: any) {
       console.error("Error OCR:", err);
-      // Si el error es de autenticación, damos una pista clara
-      if (err.message?.includes('API_KEY')) {
-        alert("Error de API Key: Asegúrate de haber REDESPLEGADO en Vercel tras agregar la variable API_KEY.");
-      } else {
-        alert("Error de conexión. Revisa tu internet.");
-      }
+      alert("Error de conexión con el servicio de IA.");
     } finally {
       setIsScanning(false);
     }
@@ -161,6 +140,20 @@ const App: React.FC = () => {
   const selectCode = (text: string) => {
     setFormData(prev => ({ ...prev, codigo: text.toLowerCase() }));
     stopCamera();
+  };
+
+  const handleGenerate = () => {
+    if (!formData.codigo.trim()) {
+      alert("Introduce el código del ticket");
+      return;
+    }
+    formatSaldoOnComplete();
+    setShowPreview(true);
+  };
+
+  const handleClear = () => {
+    setFormData({ saldo: '', codigo: '', phone: '' });
+    setShowPreview(false);
   };
 
   const getTicketBlob = async (): Promise<Blob | null> => {
@@ -176,8 +169,13 @@ const App: React.FC = () => {
       if (blob) {
         const file = new File([blob], `Yoshi-${formData.codigo || 'ticket'}.png`, { type: 'image/png' });
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: 'Ticket Yoshi Cash' });
+          await navigator.share({ 
+            files: [file], 
+            title: 'Ticket Yoshi Cash',
+            text: `Ticket digital Yoshi Cash: ${formData.codigo}` 
+          });
         } else {
+          // Fallback: descargar
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a'); 
           a.href = url; 
@@ -188,6 +186,7 @@ const App: React.FC = () => {
       }
     } catch (e) {
       console.error(e);
+      alert("Error al intentar compartir.");
     } finally {
       setIsProcessing(false);
     }
@@ -217,22 +216,22 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-gray-50 pb-20 px-4">
-      <header className="py-12 text-center flex flex-col items-center">
-        <div className="bg-white p-4 rounded-[2rem] shadow-lg mb-4">
-          <YoshiLogo className="h-16 w-16" />
+    <div className="max-w-md mx-auto min-h-screen bg-gray-50 pb-24 px-4 overflow-y-auto">
+      <header className="py-10 text-center flex flex-col items-center">
+        <div className="bg-white p-4 rounded-3xl shadow-md mb-4">
+          <YoshiLogo className="h-14 w-14" />
         </div>
-        <h1 className="text-3xl font-extrabold text-gray-900 font-title">Digitalizador QR</h1>
-        <p className="text-[#bd004d] font-black uppercase tracking-widest text-xs mt-1">Yoshi Cash Premium</p>
+        <h1 className="text-2xl font-extrabold text-gray-900 font-title">Digitalizador QR</h1>
+        <p className="text-[#bd004d] font-black uppercase tracking-widest text-[10px] mt-1">Yoshi Cash Premium</p>
       </header>
 
       <div className="space-y-6">
-        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-gray-100">
-          <div className="space-y-6">
+        <div className="bg-white rounded-[2rem] p-6 shadow-xl border border-gray-100">
+          <div className="space-y-5">
             <div>
-              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2">Saldo (Opcional)</label>
+              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-1.5">Saldo (Opcional)</label>
               <div className="relative">
-                <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
                 <input 
                   type="text" 
                   name="saldo" 
@@ -240,28 +239,29 @@ const App: React.FC = () => {
                   onChange={handleInputChange} 
                   onBlur={formatSaldoOnComplete} 
                   inputMode="decimal"
-                  className="w-full pl-10 pr-5 py-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[#bd004d]/20 transition-all font-bold text-gray-700" 
+                  className="w-full pl-9 pr-4 py-3.5 bg-gray-50 border-none rounded-xl outline-none focus:ring-2 focus:ring-[#bd004d]/10 font-bold text-gray-700" 
                   placeholder="0.00" 
                 />
               </div>
             </div>
             
             <div>
-              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2">Código del Ticket</label>
+              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-1.5">Código del Ticket</label>
               <div className="relative flex items-center">
                 <input 
                   type="text" 
                   name="codigo" 
                   value={formData.codigo} 
                   onChange={handleInputChange} 
-                  className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none lowercase focus:ring-2 focus:ring-[#bd004d]/20 transition-all font-bold text-gray-700 pr-14" 
-                  placeholder="introduce el código" 
+                  className="w-full px-4 py-3.5 bg-gray-50 border-none rounded-xl outline-none lowercase focus:ring-2 focus:ring-[#bd004d]/10 font-bold text-gray-700 pr-12" 
+                  placeholder="ej: ab12cd34" 
                 />
                 <button 
                   onClick={startCamera} 
-                  className="absolute right-3 p-2.5 text-[#bd004d] bg-white rounded-xl shadow-sm active:scale-90 transition-all"
+                  title="Abrir Cámara"
+                  className="absolute right-2 p-2 text-[#bd004d] bg-white rounded-lg shadow-sm active:scale-90 transition-all border border-gray-100"
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
@@ -269,18 +269,18 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-2 pt-1">
               <button 
                 onClick={handleGenerate} 
-                className="flex-1 py-4 bg-[#bd004d] text-white font-black rounded-2xl shadow-xl active:scale-95 transition-all text-sm uppercase tracking-widest"
+                className="flex-1 py-3.5 bg-[#bd004d] text-white font-black rounded-xl shadow-lg active:scale-95 transition-all text-xs uppercase tracking-widest"
               >
-                Generar QR
+                Generar Ticket
               </button>
               <button 
                 onClick={handleClear} 
-                className="px-5 bg-gray-100 text-gray-400 rounded-2xl hover:bg-gray-200 transition-colors"
+                className="px-4 bg-gray-100 text-gray-400 rounded-xl hover:bg-gray-200 transition-colors"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </button>
@@ -289,38 +289,61 @@ const App: React.FC = () => {
         </div>
 
         {isCameraOpen && (
-          <div className="fixed inset-0 z-50 bg-black flex flex-col">
-            <div className="relative flex-1">
+          <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+            <div className="relative flex-1 overflow-hidden">
               <video ref={videoRef} className="w-full h-full object-cover" playsInline />
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-72 h-32 border-2 border-white/60 rounded-3xl relative">
-                  <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-[#bd004d] -mt-1 -ml-1 rounded-tl-lg"></div>
-                  <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-[#bd004d] -mt-1 -mr-1 rounded-tr-lg"></div>
-                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-[#bd004d] -mb-1 -ml-1 rounded-bl-lg"></div>
-                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-[#bd004d] -mb-1 -mr-1 rounded-br-lg"></div>
+                <div className="w-64 h-32 border-2 border-white/40 rounded-2xl relative">
+                  <div className="absolute -top-1 -left-1 w-5 h-5 border-t-4 border-l-4 border-[#bd004d] rounded-tl-md"></div>
+                  <div className="absolute -top-1 -right-1 w-5 h-5 border-t-4 border-r-4 border-[#bd004d] rounded-tr-md"></div>
+                  <div className="absolute -bottom-1 -left-1 w-5 h-5 border-b-4 border-l-4 border-[#bd004d] rounded-bl-md"></div>
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 border-b-4 border-r-4 border-[#bd004d] rounded-br-md"></div>
                 </div>
               </div>
-              <button onClick={stopCamera} className="absolute top-10 right-6 p-3 bg-black/50 rounded-full text-white">
+              <button 
+                onClick={stopCamera} 
+                className="absolute top-10 right-6 p-3 bg-black/40 backdrop-blur-md rounded-full text-white active:scale-90"
+              >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-            <div className="bg-white p-10 rounded-t-[3rem] -mt-12 relative z-10 flex flex-col items-center min-h-[340px]">
-              <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-10"></div>
+            <div className="bg-white p-8 rounded-t-[2.5rem] flex flex-col items-center min-h-[280px] relative">
+              <div className="w-10 h-1 bg-gray-200 rounded-full mb-8"></div>
               {!isScanning && extractedTexts.length === 0 && (
-                <button 
-                  onClick={captureAndExtract} 
-                  className="w-24 h-24 rounded-full bg-[#bd004d] shadow-2xl flex items-center justify-center text-white active:scale-90 transition-all"
-                >
-                  <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 9a3 3 0 100 6 3 3 0 000-6z" /><path fillRule="evenodd" d="M5.93 5.417C7.625 3.167 10.334 2 12 2c1.667 0 4.375 1.167 6.07 3.417.433.574.808 1.218 1.116 1.916.19.43.35.88.48 1.347h.334A2 2 0 0122 10.667v8a2 2 0 01-2 2H4a2 2 0 01-2-2v-8a2 2 0 012-2h.334c.13-.466.29-.917.48-1.347.308-.698.683-1.342 1.116-1.916zM17 13a5 5 0 11-10 0 5 5 0 0110 0z" clipRule="evenodd" /></svg>
-                </button>
+                <div className="flex flex-col items-center gap-4">
+                  <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest">Enfoca el código del ticket</p>
+                  <button 
+                    onClick={captureAndExtract} 
+                    className="w-20 h-20 rounded-full bg-[#bd004d] shadow-2xl flex items-center justify-center text-white active:scale-90 transition-transform border-4 border-white"
+                  >
+                    <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 9a3 3 0 100 6 3 3 0 000-6z" />
+                      <path fillRule="evenodd" d="M5.93 5.417C7.625 3.167 10.334 2 12 2c1.667 0 4.375 1.167 6.07 3.417.433.574.808 1.218 1.116 1.916.19.43.35.88.48 1.347h.334A2 2 0 0122 10.667v8a2 2 0 01-2 2H4a2 2 0 01-2-2v-8a2 2 0 012-2h.334c.13-.466.29-.917.48-1.347.308-.698.683-1.342 1.116-1.916zM17 13a5 5 0 11-10 0 5 5 0 0110 0z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
               )}
-              {isScanning && <div className="animate-spin w-16 h-16 border-4 border-[#bd004d] border-t-transparent rounded-full my-10"></div>}
+              {isScanning && (
+                <div className="flex flex-col items-center py-6">
+                  <div className="animate-spin w-12 h-12 border-4 border-[#bd004d] border-t-transparent rounded-full mb-4"></div>
+                  <p className="text-[10px] font-black text-[#bd004d] uppercase tracking-widest">Digitalizando...</p>
+                </div>
+              )}
               {extractedTexts.length > 0 && (
-                <div className="w-full space-y-4">
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    {extractedTexts.map((t, i) => <button key={i} onClick={() => selectCode(t)} className="px-6 py-4 bg-gray-50 border-2 border-transparent hover:border-[#bd004d] rounded-2xl font-black uppercase text-sm">{t}</button>)}
+                <div className="w-full animate-in fade-in slide-in-from-bottom-4">
+                  <p className="text-[10px] font-black text-gray-400 uppercase text-center mb-4 tracking-widest">Códigos Detectados</p>
+                  <div className="flex flex-wrap gap-2 justify-center max-h-[140px] overflow-y-auto">
+                    {extractedTexts.map((t, i) => (
+                      <button 
+                        key={i} 
+                        onClick={() => selectCode(t)} 
+                        className="px-5 py-3 bg-gray-50 border border-gray-100 hover:border-[#bd004d] hover:bg-[#bd004d]/5 rounded-xl font-black uppercase text-xs transition-all"
+                      >
+                        {t}
+                      </button>
+                    ))}
                   </div>
-                  <button onClick={() => setExtractedTexts([])} className="w-full text-xs font-black text-[#bd004d] uppercase mt-4">Reintentar</button>
+                  <button onClick={() => setExtractedTexts([])} className="w-full text-[9px] font-black text-[#bd004d] uppercase mt-6 tracking-[0.2em]">Escanear de nuevo</button>
                 </div>
               )}
               <canvas ref={canvasRef} className="hidden" />
@@ -329,19 +352,43 @@ const App: React.FC = () => {
         )}
 
         {showPreview && (
-          <div className="space-y-8 pb-20">
+          <div className="space-y-6 pb-20 animate-in fade-in duration-500">
             <TicketPreview data={formData} innerRef={ticketRef} />
-            <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border border-gray-100 space-y-4">
-              <input 
-                type="tel" 
-                name="phone" 
-                value={formData.phone} 
-                onChange={handleInputChange} 
-                className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl outline-none font-black text-gray-700" 
-                placeholder="521..." 
-              />
-              <button onClick={handleSend} disabled={isProcessing} className="w-full py-5 bg-[#bd004d] text-white font-black rounded-2xl shadow-xl">Enviar</button>
-              <button onClick={handleShare} disabled={isProcessing} className="w-full py-5 bg-gray-900 text-white font-black rounded-2xl shadow-xl">Compartir</button>
+            
+            <div className="bg-white p-6 rounded-[2rem] shadow-xl border border-gray-100 space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 ml-1">WhatsApp del Cliente</label>
+                <input 
+                  type="tel" 
+                  name="phone" 
+                  value={formData.phone} 
+                  onChange={handleInputChange} 
+                  className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-xl outline-none font-black text-gray-700 focus:ring-2 focus:ring-[#bd004d]/10" 
+                  placeholder="521..." 
+                />
+              </div>
+              
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={handleSend} 
+                  disabled={isProcessing} 
+                  className="w-full py-4.5 bg-[#bd004d] text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all text-sm uppercase tracking-widest disabled:opacity-50 h-14"
+                >
+                  {isProcessing ? "Procesando..." : "Enviar"}
+                </button>
+                
+                <button 
+                  onClick={handleShare} 
+                  disabled={isProcessing} 
+                  className="w-full py-4.5 bg-[#bd004d] text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all text-sm uppercase tracking-widest disabled:opacity-50 h-14"
+                >
+                  Compartir
+                </button>
+              </div>
+              
+              {copyStatus === 'success' && (
+                <p className="text-[9px] text-green-600 font-black uppercase text-center tracking-widest animate-pulse">Imagen copiada. Pégala en WhatsApp.</p>
+              )}
             </div>
           </div>
         )}
