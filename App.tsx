@@ -234,11 +234,7 @@ const App: React.FC = () => {
           URL.revokeObjectURL(url);
         }
       }
-    } catch (e) {
-      alert("");
-    } finally {
-      setIsProcessing(false);
-    }
+    } 
   };
 
   const handleSend = async () => {
