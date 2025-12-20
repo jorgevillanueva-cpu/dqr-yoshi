@@ -5,19 +5,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     
-    <!-- Meta etiquetas para iOS (Standalone App) -->
+    <!-- Meta etiquetas críticas para PWA e iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="YoshiCash">
-    <meta name="format-detection" content="telephone=no">
     <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#bd004d">
+    <meta name="format-detection" content="telephone=no">
     
     <title>Digitalizador QR - Yoshi Cash</title>
     
-    <!-- Iconos y Manifiesto -->
+    <!-- Iconos reparados (Base64 limpio) -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUwMCA1MDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgICA8cmVjdCB3aWR0aD0iNTAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0id2hpdGUiLz4KICAgIDxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2JkMDA0ZCIgc3Ryb2tlLXdpZHRoPSIzOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj4KICAgICAgPHBhdGggZD0iTSAxMjUgODAgTCAxMjUgMzc1IEMgMTI1IDM3NSAxMjUgNDIwIDE3MCA0MjAgTCAyNDUgNDIwIEwgMjQ1IDM1MCIgLz4KICAgICAgPHBhdGggZD0iTSAyNDUgMzUwIEMgMjQ1IDM1MCAyNDUgNDIwIDMxMCA0MjAgQyAzNzUgNDIwIDQyNSAzNzUgNDI1IDI1MCBDIDQyNSAxMjUgMzUwIDgwIDI1MCA4MCBMIDEyNSA4MCIgLz4KICAgICAgPHBhdGggZD0iTSAyNTAgODAgQyAyNTAgODAgMTgwIDgwIDE4MCAyMjAgQyAxODAgMzUwIDMwMCAzNzAgMzAwIDMzMCIgLz4KICAgICAgPGNpcmNsZSBjeD0iMzM1IiBjeT0iMjM1IiByPSIyMiIgZmlsbD0iI2JkMDA0ZCIgc3Ryb2tlPSJub25lIiAvPgogICAgPC9nPgo8L3N2Zz4=">
-    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUwMCA1MDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgICA8cmVjdCB3aWR0aD0iNTAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0id2hpdGUiLz4KIC2ZIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2JkMDA0ZCIgc3Ryb2tlLXdpZHRoPSIzOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj4KICAgICAgPHBhdGggZD0iTSAxMjUgODAgTCAxMjUgMzc1IEMgMTI1IDM3NSAxMjUgNDIwIDE3MCA0MjAgTCAyNDUgNDIwIEwgMjQ1IDM1MCIgLz4KICAgICAgPHBhdGggZD0iTSAyNDUgMzUwIEMgMjQ1IDM1MCAyNDUgNDIwIDMxMCA0MjAgQyAzNzUgNDIwIDQyNSAzNzUgNDI1IDI1MCBDIDQyNSAxMjUgMzUwIDgwIDI1MCA4MCBMIDEyNSA4MCIgLz4KICAgICAgPHBhdGggZD0iTSAyNTAgODAgQyAyNTAgODAgMTgwIDgwIDE4MCAyMjAgQyAxODAgMzUwIDMwMCAzNzAgMzAwIDMzMCIgLz4KICAgICAgPGNpcmNsZSBjeD0iMzM1IiBjeT0iMjM1IiByPSIyMiIgZmlsbD0iI2JkMDA0ZCIgc3Ryb2tlPSJub25lIiAvPgogICAgPC9nPgo8L3N2Zz4=">
-    <link rel="manifest" href="./metadata.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUwMCA1MDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgICA8cmVjdCB3aWR0aD0iNTAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0id2hpdGUiLz4KICAgIDxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2JkMDA0ZCIgc3Ryb2tlLXdpZHRoPSIzOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj4KICAgICAgPHBhdGggZD0iTSAxMjUgODAgTCAxMjUgMzc1IEMgMTI1IDM3NSAxMjUgNDIwIDE3MCA0MjAgTCAyNDUgNDIwIEwgMjQ1IDM1MCIgLz4KICAgICAgPHBhdGggZD0iTSAyNDUgMzUwIEMgMjQ1IDM1MCAyNDUgNDIwIDMxMCA0MjAgQyAzNzUgNDIwIDQyNSAzNzUgNDI1IDI1MCBDIDQyNSAxMjUgMzUwIDgwIDI1MCA4MCBMIDEyNSA4MCIgLz4KICAgICAgPHBhdGggZD0iTSAyNTAgODAgQyAyNTAgODAgMTgwIDgwIDE4MCAyMjAgQyAxODAgMzUwIDMwMCAzNzAgMzAwIDMzMCIgLz4KICAgICAgPGNpcmNsZSBjeD0iMzM1IiBjeT0iMjM1IiByPSIyMiIgZmlsbD0iI2JkMDA0ZCIgc3Ryb2tlPSJub25lIiAvPgogICAgPC9nPgo8L3N2Zz4=">
+    
+    <link rel="manifest" href="metadata.json">
     
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -34,7 +36,6 @@
         font-family: 'Plus Jakarta Sans', sans-serif;
         letter-spacing: -0.03em;
       }
-      /* Fix para iOS: previene scroll elástico y asegura que el contenido llene la pantalla */
       html, body {
         position: fixed;
         overflow: hidden;
@@ -66,12 +67,21 @@
 <body class="bg-gray-50">
     <div id="root"></div>
     <script>
-      // Registro del Service Worker para soporte PWA e instalación
+      // Registro del Service Worker con resolución de URL absoluta para evitar "Origin mismatch"
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('SW registrado', reg))
-            .catch(err => console.log('SW error', err));
+          const swPath = new URL('sw.js', window.location.href).href;
+          
+          navigator.serviceWorker.register(swPath, { scope: './' })
+            .then(reg => {
+              console.log('PWA Service Worker registrado con éxito en:', reg.scope);
+            })
+            .catch(err => {
+              console.error('Error crítico al registrar Service Worker:', err);
+              if (err.message.includes('origin')) {
+                navigator.serviceWorker.register('sw.js');
+              }
+            });
         });
       }
     </script>
