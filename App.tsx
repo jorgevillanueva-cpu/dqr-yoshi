@@ -274,8 +274,8 @@ const App: React.FC = () => {
         <div className="bg-white p-4 rounded-3xl shadow-md mb-4 border border-gray-100/50">
           <YoshiLogo className="h-14 w-14" />
         </div>
-        <h1 className="text-2xl font-extrabold text-gray-900 font-title tracking-tight">Yoshi Digitalizer</h1>
-        <p className="text-[#bd004d] font-black uppercase tracking-widest text-[10px] mt-1">Scanner Pro v3.2</p>
+        <h1 className="text-2xl font-extrabold text-gray-900 font-title tracking-tight">Digitalizador QR</h1>
+        <p className="text-[#bd004d] font-black uppercase tracking-widest text-[10px] mt-1">Yoshi Cash</p>
       </header>
 
       <div className="space-y-6">
