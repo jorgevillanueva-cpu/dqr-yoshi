@@ -82,7 +82,7 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
           
           <QRCodeSVG 
             value={data.codigo || 'yoshi'} 
-            size={400}
+            size={550}
             level="H"
             fgColor="#000000"
             bgColor="transparent"
@@ -92,7 +92,7 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
 
         <p className="text-[20px] font-medium text-gray-400 text-center mt-10 max-w-[95%] leading-tight tracking-tight">
           Solicita tu saldo remanente desde<br/>
-          <span className="text-[20px] text-[#bd004d] font-bold lowercase tracking-wider">https://yoshicash.com/refunds</span>
+          <span className="text-[14px] text-[#bd004d] font-bold lowercase tracking-wider">https://yoshicash.com/refunds</span>
         </p>
       </div>
 
