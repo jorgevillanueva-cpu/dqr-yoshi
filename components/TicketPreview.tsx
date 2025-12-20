@@ -82,7 +82,7 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
           
           <QRCodeSVG 
             value={data.codigo || 'yoshi'} 
-            size={300}
+            size={400}
             level="H"
             fgColor="#000000"
             bgColor="transparent"
