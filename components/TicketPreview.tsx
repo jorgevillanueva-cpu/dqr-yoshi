@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { TicketData } from '../types';
@@ -24,14 +25,14 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
   return (
     <div 
       ref={innerRef}
-      className="relative w-full max-w-[450px] aspect-[707/1560] bg-white shadow-2xl rounded-xl overflow-hidden mx-auto flex flex-col"
+      className="relative w-full max-w-[450px] aspect-[707/1800] bg-white shadow-2xl rounded-xl overflow-hidden mx-auto flex flex-col"
       style={{ 
         fontFamily: 'system-ui, -apple-system, sans-serif',
         backgroundColor: '#F9FAFB' 
       }}
     >
       {/* Cabecera con Logo */}
-      <div className="relative h-[12%] w-full bg-white flex flex-col items-center justify-center border-b-2 border-dashed border-gray-100">
+      <div className="relative h-[11%] w-full bg-white flex flex-col items-center justify-center border-b-2 border-dashed border-gray-100">
         <div className="flex flex-col items-center">
           <YoshiLogo className="h-20 w-20" />
           <h2 className="text-[20px] font-extrabold text-gray-900 font-title -mt-2 tracking-tight">
@@ -95,18 +96,20 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
         </p>
       </div>
 
-      {/* Pie de Ticket con Código Moderno y Discreto */}
-      <div className="h-[14%] bg-white flex flex-col items-center justify-center px-8 border-t-2 border-dashed border-gray-100 pb-4">
-        <div className="text-center w-full">
+      {/* Pie de Ticket alaragado (Sección blanca final) */}
+      <div className="h-[22%] bg-white flex flex-col items-center justify-start pt-10 px-8 border-t-2 border-dashed border-gray-100">
+        <div className="text-center w-full mb-6">
           <p className="text-lg font-medium text-gray-500 break-all lowercase leading-tight tracking-[0.25em] font-mono">
             {data.codigo || '---'}
           </p>
         </div>
-        <div className="mt-4 flex gap-1.5 h-6 opacity-20 w-full justify-center">
+        <div className="flex gap-1.5 h-6 opacity-20 w-full justify-center">
            {Array.from({ length: 60 }).map((_, i) => (
              <div key={i} className="bg-black" style={{ width: `${Math.random() * 4 + 1}px` }}></div>
            ))}
         </div>
+        {/* Espacio blanco extra al final para simular el corte del ticket */}
+        <div className="flex-1 w-full"></div>
       </div>
     </div>
   );

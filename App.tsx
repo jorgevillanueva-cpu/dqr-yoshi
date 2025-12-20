@@ -163,28 +163,26 @@ const App: React.FC = () => {
     const base64Image = canvasRef.current.toDataURL('image/jpeg', 0.8).split(',')[1];
 
     try {
-      if (!process.env.API_KEY) {
-        throw new Error("Clave de API no disponible en el entorno.");
-      }
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      // Inicializamos el cliente directamente con la clave del entorno
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: [{
           parts: [
             { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
-            { text: "Eres un experto en OCR para tickets de prepago. Localiza el ID del ticket o código de barras alfanumérico. Devuelve solo los códigos detectados de más de 4 caracteres, uno por línea, sin texto adicional." }
+            { text: "Eres un experto en OCR para tickets de prepago. Localiza el ID del ticket, PIN o código de barras alfanumérico. Devuelve solo los códigos detectados de más de 4 caracteres, uno por línea, sin texto adicional. Prioriza códigos que parezcan folios o números de serie." }
           ]
         }]
       });
 
       const textOutput = response.text;
       if (!textOutput || textOutput.trim() === "") {
-        throw new Error("No se pudo detectar ningún texto legible.");
+        throw new Error("No se detectó texto legible. Intenta acercar más la cámara al código.");
       }
 
       const results = textOutput.split('\n')
         .map(t => t.trim())
-        .filter(t => t.length > 3 && t.length < 30);
+        .filter(t => t.length > 3 && t.length < 35);
       
       setExtractedTexts(results);
       if (results.length === 0) {
@@ -192,7 +190,7 @@ const App: React.FC = () => {
       }
     } catch (err: any) {
       console.error("Error OCR:", err);
-      alert(`Error al procesar: ${err.message || 'Error de conexión con el servidor'}`);
+      alert(`Error en el escaneo: ${err.message || 'Verifica tu conexión a internet'}`);
     } finally {
       setIsScanning(false);
     }
@@ -418,7 +416,7 @@ const App: React.FC = () => {
               {isScanning && (
                 <div className="flex flex-col items-center gap-4 py-8">
                   <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#bd004d] border-t-transparent"></div>
-                  <p className="font-bold text-gray-500 animate-pulse">Analizando...</p>
+                  <p className="font-bold text-gray-500 animate-pulse">Analizando Ticket...</p>
                 </div>
               )}
               {extractedTexts.length > 0 && (
@@ -467,7 +465,7 @@ const App: React.FC = () => {
                   className="w-full py-4 text-white font-bold rounded-2xl shadow-md disabled:opacity-50"
                   style={{ backgroundColor: COLORS.PRIMARY }}
                 >
-                  {isProcessing ? "Procesando..." : "Copiar y abrir WhatsApp"}
+                  {isProcessing ? "Procesando..." : "Enviar"}
                 </button>
                 <button 
                   onClick={handleShare} 
@@ -475,7 +473,7 @@ const App: React.FC = () => {
                   className="w-full py-4 text-white font-bold rounded-2xl shadow-lg disabled:opacity-50" 
                   style={{ backgroundColor: COLORS.PRIMARY }}
                 >
-                  Compartir Ticket
+                  Compartir
                 </button>
               </div>
             </div>
