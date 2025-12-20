@@ -78,7 +78,7 @@ const App: React.FC = () => {
         videoRef.current.play();
       }
     } catch (err) {
-      alert("No se pudo activar la cámara. Revisa los permisos del navegador.");
+      alert("No se pudo activar la cámara.");
       setIsCameraOpen(false);
     }
   };
@@ -94,44 +94,56 @@ const App: React.FC = () => {
   const captureAndExtract = async () => {
     if (!videoRef.current || !canvasRef.current) return;
     
-    const key = process.env.API_KEY;
-    if (!key || key === "undefined") {
-      alert("Error: La API Key no se ha detectado. Recuerda hacer 'REDEPLOY' en Vercel después de agregar la variable de entorno.");
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      alert("Error: API Key no configurada.");
       return;
     }
 
     setIsScanning(true);
-    const context = canvasRef.current.getContext('2d');
-    canvasRef.current.width = videoRef.current.videoWidth;
-    canvasRef.current.height = videoRef.current.videoHeight;
-    context?.drawImage(videoRef.current, 0, 0);
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+
+    const maxWidth = 800;
+    const scale = Math.min(1, maxWidth / video.videoWidth);
+    canvas.width = video.videoWidth * scale;
+    canvas.height = video.videoHeight * scale;
     
-    const base64Image = canvasRef.current.toDataURL('image/jpeg', 0.8).split(',')[1];
+    context?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const base64Image = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
 
     try {
-      const ai = new GoogleGenAI({ apiKey: key });
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: {
-          parts: [
-            { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
-            { text: "OCR: Extrae el código alfanumérico largo del ticket. Devuelve solo los códigos encontrados, uno por línea." }
-          ]
-        }
+        contents: [
+          {
+            parts: [
+              { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
+              { text: "Extrae exclusivamente el código alfanumérico del ticket." }
+            ]
+          }
+        ],
+        config: {
+          systemInstruction: "Eres un experto en OCR ultra-rápido. Devuelve únicamente el código de ticket detectado, sin etiquetas ni explicaciones. Prioriza la velocidad.",
+          thinkingConfig: { thinkingBudget: 0 } 
+        },
       });
 
-      const results = (response.text || "")
-        .split('\n')
-        .map(t => t.trim())
-        .filter(t => t.length > 3 && t.length < 32);
+      const textOutput = response.text || "";
+      const results = textOutput
+        .split(/[\s\n,]+/)
+        .map(t => t.trim().replace(/[^a-zA-Z0-9]/g, ''))
+        .filter(t => t.length >= 6 && t.length <= 25);
 
       setExtractedTexts(results);
       if (results.length === 0) {
-        alert("No se detectó el código. Prueba acercando más el ticket o mejorando la luz.");
+        alert("No se detectó el código. Prueba acercando el ticket.");
       }
     } catch (err: any) {
-      console.error("Error OCR:", err);
-      alert("Error de conexión con el servicio de IA.");
+      console.error("Gemini Error:", err);
+      alert("Error de red. Reintenta.");
     } finally {
       setIsScanning(false);
     }
@@ -144,7 +156,7 @@ const App: React.FC = () => {
 
   const handleGenerate = () => {
     if (!formData.codigo.trim()) {
-      alert("Introduce el código del ticket");
+      alert("Introduce el código");
       return;
     }
     formatSaldoOnComplete();
@@ -158,8 +170,13 @@ const App: React.FC = () => {
 
   const getTicketBlob = async (): Promise<Blob | null> => {
     if (!ticketRef.current) return null;
-    const canvas = await html2canvas(ticketRef.current, { scale: 3, backgroundColor: '#F9FAFB', useCORS: true });
-    return new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
+    const canvas = await html2canvas(ticketRef.current, { 
+      scale: 2.5, 
+      backgroundColor: '#F9FAFB', 
+      useCORS: true,
+      logging: false
+    });
+    return new Promise(resolve => canvas.toBlob(resolve, 'image/png', 0.9));
   };
 
   const handleShare = async () => {
@@ -172,44 +189,54 @@ const App: React.FC = () => {
           await navigator.share({ 
             files: [file], 
             title: 'Ticket Yoshi Cash',
-            text: `Ticket digital Yoshi Cash: ${formData.codigo}` 
+            text: `Ticket digital: ${formData.codigo}` 
           });
         } else {
-          // Fallback: descargar
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a'); 
           a.href = url; 
-          a.download = `Yoshi-${formData.codigo || 'ticket'}.png`; 
+          a.download = `Yoshi-${formData.codigo}.png`; 
           a.click();
           URL.revokeObjectURL(url);
         }
       }
     } catch (e) {
-      console.error(e);
-      alert("Error al intentar compartir.");
+      alert("Error al compartir.");
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleSend = async () => {
-    if (!formData.phone) { alert("Introduce un número de teléfono"); return; }
+    if (!formData.phone) { alert("Introduce un número"); return; }
+    
+    // Guardamos el número limpio antes de resetear el estado
+    const phoneToOpen = formData.phone.replace(/\D/g, '');
+    
     setIsProcessing(true);
     setCopyStatus('copying');
+    
     try {
       const blob = await getTicketBlob();
       if (blob && navigator.clipboard?.write) {
         await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
         setCopyStatus('success');
+        
+        // Esperamos un segundo para que el usuario vea el feedback visual y luego abrimos WhatsApp
         setTimeout(() => {
-          window.open(`https://wa.me/${formData.phone.replace(/\D/g, '')}`, '_blank');
+          window.open(`https://wa.me/${phoneToOpen}`, '_blank');
           setCopyStatus('idle');
-        }, 1200);
+          // Limpiamos el campo de teléfono después de abrir WhatsApp
+          setFormData(prev => ({ ...prev, phone: '' }));
+        }, 1000);
       } else {
-        window.open(`https://wa.me/${formData.phone.replace(/\D/g, '')}`, '_blank');
+        window.open(`https://wa.me/${phoneToOpen}`, '_blank');
+        setFormData(prev => ({ ...prev, phone: '' }));
       }
     } catch (e) {
-      window.open(`https://wa.me/${formData.phone.replace(/\D/g, '')}`, '_blank');
+      console.error(e);
+      window.open(`https://wa.me/${phoneToOpen}`, '_blank');
+      setFormData(prev => ({ ...prev, phone: '' }));
     } finally {
       setIsProcessing(false);
     }
@@ -258,7 +285,6 @@ const App: React.FC = () => {
                 />
                 <button 
                   onClick={startCamera} 
-                  title="Abrir Cámara"
                   className="absolute right-2 p-2 text-[#bd004d] bg-white rounded-lg shadow-sm active:scale-90 transition-all border border-gray-100"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -311,7 +337,7 @@ const App: React.FC = () => {
               <div className="w-10 h-1 bg-gray-200 rounded-full mb-8"></div>
               {!isScanning && extractedTexts.length === 0 && (
                 <div className="flex flex-col items-center gap-4">
-                  <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest">Enfoca el código del ticket</p>
+                  <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest text-center">Escaneo Ultra-Rápido</p>
                   <button 
                     onClick={captureAndExtract} 
                     className="w-20 h-20 rounded-full bg-[#bd004d] shadow-2xl flex items-center justify-center text-white active:scale-90 transition-transform border-4 border-white"
@@ -326,12 +352,12 @@ const App: React.FC = () => {
               {isScanning && (
                 <div className="flex flex-col items-center py-6">
                   <div className="animate-spin w-12 h-12 border-4 border-[#bd004d] border-t-transparent rounded-full mb-4"></div>
-                  <p className="text-[10px] font-black text-[#bd004d] uppercase tracking-widest">Digitalizando...</p>
+                  <p className="text-[10px] font-black text-[#bd004d] uppercase tracking-widest">Leyendo...</p>
                 </div>
               )}
               {extractedTexts.length > 0 && (
                 <div className="w-full animate-in fade-in slide-in-from-bottom-4">
-                  <p className="text-[10px] font-black text-gray-400 uppercase text-center mb-4 tracking-widest">Códigos Detectados</p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase text-center mb-4 tracking-widest">Texto Extraído</p>
                   <div className="flex flex-wrap gap-2 justify-center max-h-[140px] overflow-y-auto">
                     {extractedTexts.map((t, i) => (
                       <button 
@@ -343,7 +369,7 @@ const App: React.FC = () => {
                       </button>
                     ))}
                   </div>
-                  <button onClick={() => setExtractedTexts([])} className="w-full text-[9px] font-black text-[#bd004d] uppercase mt-6 tracking-[0.2em]">Escanear de nuevo</button>
+                  <button onClick={() => setExtractedTexts([])} className="w-full text-[9px] font-black text-[#bd004d] uppercase mt-6 tracking-[0.2em]">Reintentar</button>
                 </div>
               )}
               <canvas ref={canvasRef} className="hidden" />
@@ -368,7 +394,7 @@ const App: React.FC = () => {
                 />
               </div>
               
-              <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <button 
                   onClick={handleSend} 
                   disabled={isProcessing} 
@@ -387,7 +413,7 @@ const App: React.FC = () => {
               </div>
               
               {copyStatus === 'success' && (
-                <p className="text-[9px] text-green-600 font-black uppercase text-center tracking-widest animate-pulse">Imagen copiada. Pégala en WhatsApp.</p>
+                <p className="text-[9px] text-green-600 font-black uppercase text-center tracking-widest animate-pulse">Imagen copiada.</p>
               )}
             </div>
           </div>
