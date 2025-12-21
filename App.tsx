@@ -98,50 +98,52 @@ const App: React.FC = () => {
 
   const captureAndExtract = async () => {
     if (!videoRef.current || !canvasRef.current) return;
+    
     setIsScanning(true);
-
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
+    const context = canvas.getContext('2d', { willReadFrequently: true });
     
-    // Captura a resolución moderada para optimizar procesamiento
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    context?.drawImage(video, 0, 0);
+    // Captura a resolución moderada
+    canvas.width = video.videoWidth || 1024;
+    canvas.height = video.videoHeight || 768;
     
-    const base64Image = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
-
     try {
-      // Inicializar AI justo antes de la llamada según guías
+      context?.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      const base64Image = dataUrl.split(',')[1];
+
+      if (!base64Image) {
+        throw new Error("No se pudo capturar la imagen correctamente.");
+      }
+
+      // Inicializar AI justo antes de la llamada
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: {
+        model: 'gemini-3-flash-preview',
+        contents: [{
           parts: [
             { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
-            { text: "Extract any alphanumeric reference codes, long IDs, or unique strings from this image. Look for anything that looks like a ticket number or reference. Return only a comma-separated list of the codes found. No extra text." }
+            { text: "Extract any ticket IDs, reference numbers, or alphanumeric codes from this image. Only return the codes separated by commas. Do not include any other text or explanation." }
           ]
-        }
+        }]
       });
 
       const text = response.text || "";
       const results = text.split(',')
         .map(s => s.trim().replace(/[^a-zA-Z0-9-]/g, ''))
-        .filter(s => s.length > 4); // Filtramos ruidos cortos
+        .filter(s => s.length > 4);
       
       if (results.length > 0) {
         setExtractedCodes(results);
         showPopMessage("Códigos detectados", 'success');
       } else {
-        showPopMessage("No se encontraron códigos legibles", 'info');
+        showPopMessage("No se encontraron códigos claros", 'info');
       }
     } catch (err: any) {
-      console.error("Error OCR:", err);
-      const errorMsg = err.message?.includes('API_KEY') 
-        ? "Error de autenticación (API Key)" 
-        : "Error al procesar la imagen";
-      showPopMessage(errorMsg, 'error');
+      console.error("Error detallado OCR:", err);
+      showPopMessage("Error al procesar la imagen", 'error');
     } finally {
       setIsScanning(false);
     }
