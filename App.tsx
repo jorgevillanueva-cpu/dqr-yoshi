@@ -191,11 +191,15 @@ const App: React.FC = () => {
           showPopMessage("Descarga iniciada", 'success');
         }
       }
+<<<<<<< HEAD
     } catch (e) {
       console.log("Acción de compartir cancelada u omitida.");
     } finally {
       setIsProcessing(false);
     }
+=======
+    } 
+>>>>>>> 52c720916d8b7d0509bed2f2bf4261545d6525c7
   };
 
   const handleSend = async () => {
@@ -275,7 +279,7 @@ const App: React.FC = () => {
             </div>
             
             <div>
-              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">Código Referencia</label>
+              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">Ingresa Código de Ticket</label>
               <div className="relative flex items-center">
                 <input 
                   type="text" 

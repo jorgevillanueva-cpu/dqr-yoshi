@@ -71,19 +71,31 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
         <div className="absolute -left-5 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-gray-50 border border-gray-100 shadow-inner"></div>
         <div className="absolute -right-5 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-gray-50 border border-gray-100 shadow-inner"></div>
 
+<<<<<<< HEAD
         <p className="text-[18px] font-medium text-gray-400 text-center mb-8 max-w-[90%] leading-snug tracking-tight">
           Usa este ticket para pagar presentando el código QR
         </p>
 
         {/* Contenedor del QR */}
         <div className="w-full aspect-square bg-white rounded-[40px] shadow-2xl border-2 border-gray-50 p-4 flex items-center justify-center relative overflow-hidden group">
+=======
+        <p className="text-[20px] font-medium text-gray-400 text-center mb-8 max-w-[90%] leading-snug tracking-tight">
+          Usa este ticket para pagar presentando el código QR
+        </p>
+
+        <div className="w-full aspect-square bg-white rounded-[50px] shadow-2xl border-2 border-gray-50 p-10 flex items-center justify-center relative overflow-hidden group">
+>>>>>>> 52c720916d8b7d0509bed2f2bf4261545d6525c7
           <div className="absolute inset-0 opacity-[0.03] flex items-center justify-center rotate-12">
              <YoshiLogo className="w-[120%]" />
           </div>
           
           <QRCodeSVG 
             value={data.codigo || 'yoshi'} 
+<<<<<<< HEAD
             size={340}
+=======
+            size={550}
+>>>>>>> 52c720916d8b7d0509bed2f2bf4261545d6525c7
             level="H"
             fgColor="#000000"
             bgColor="transparent"
@@ -91,7 +103,11 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
           />
         </div>
 
+<<<<<<< HEAD
         <p className="text-[18px] font-medium text-gray-400 text-center mt-10 max-w-[95%] leading-tight tracking-tight">
+=======
+        <p className="text-[20px] font-medium text-gray-400 text-center mt-10 max-w-[95%] leading-tight tracking-tight">
+>>>>>>> 52c720916d8b7d0509bed2f2bf4261545d6525c7
           Solicita tu saldo remanente desde<br/>
           <span className="text-[16px] text-[#bd004d] font-bold lowercase tracking-wider">https://yoshicash.com/refunds</span>
         </p>
@@ -100,7 +116,11 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
       {/* Pie de Ticket */}
       <div className="h-[22%] bg-white flex flex-col items-center justify-start pt-10 px-8 border-t-2 border-dashed border-gray-100">
         <div className="text-center w-full mb-6">
+<<<<<<< HEAD
           <p className="text-lg font-medium text-black break-all lowercase leading-tight tracking-[0.25em] font-mono">
+=======
+          <p className="text-lg font-medium text-Black-500 break-all lowercase leading-tight tracking-[0.25em] font-mono">
+>>>>>>> 52c720916d8b7d0509bed2f2bf4261545d6525c7
             {data.codigo || '---'}
           </p>
         </div>
