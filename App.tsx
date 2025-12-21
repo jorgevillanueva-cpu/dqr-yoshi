@@ -15,10 +15,8 @@ const App: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copying' | 'success' | 'error'>('idle');
   
-  // Estado para Notificaciones Pop (Toasts)
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
 
-  // Estados para Cámara y OCR
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [extractedCodes, setExtractedCodes] = useState<string[]>([]);
@@ -27,7 +25,6 @@ const App: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Efecto para desvanecer el toast automáticamente
   useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => {
@@ -75,7 +72,11 @@ const App: React.FC = () => {
     setExtractedCodes([]);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } 
+        video: { 
+          facingMode: 'environment', 
+          width: { ideal: 1024 }, 
+          height: { ideal: 768 } 
+        } 
       });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -103,38 +104,44 @@ const App: React.FC = () => {
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
     
+    // Captura a resolución moderada para optimizar procesamiento
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     context?.drawImage(video, 0, 0);
     
-    const base64Image = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+    const base64Image = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
 
     try {
+      // Inicializar AI justo antes de la llamada según guías
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: [{
+        model: 'gemini-2.5-flash',
+        contents: {
           parts: [
             { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
-            { text: "Extract any alphanumeric reference codes or IDs from this image. Return them as a simple comma-separated list. Only return the codes." }
+            { text: "Extract any alphanumeric reference codes, long IDs, or unique strings from this image. Look for anything that looks like a ticket number or reference. Return only a comma-separated list of the codes found. No extra text." }
           ]
-        }]
+        }
       });
 
       const text = response.text || "";
       const results = text.split(',')
-        .map(s => s.trim())
-        .filter(s => s.length > 3);
+        .map(s => s.trim().replace(/[^a-zA-Z0-9-]/g, ''))
+        .filter(s => s.length > 4); // Filtramos ruidos cortos
       
       if (results.length > 0) {
         setExtractedCodes(results);
-        showPopMessage("Códigos detectados con éxito", 'success');
+        showPopMessage("Códigos detectados", 'success');
       } else {
-        showPopMessage("No se detectaron códigos claros. Intenta de nuevo.", 'info');
+        showPopMessage("No se encontraron códigos legibles", 'info');
       }
-    } catch (err) {
-      console.error(err);
-      showPopMessage("Error al procesar la imagen.", 'error');
+    } catch (err: any) {
+      console.error("Error OCR:", err);
+      const errorMsg = err.message?.includes('API_KEY') 
+        ? "Error de autenticación (API Key)" 
+        : "Error al procesar la imagen";
+      showPopMessage(errorMsg, 'error');
     } finally {
       setIsScanning(false);
     }
@@ -192,7 +199,7 @@ const App: React.FC = () => {
         }
       }
     } catch (e) {
-      console.log("Acción de compartir cancelada u omitida.");
+      console.log("Acción de compartir cancelada.");
       showPopMessage("no se compartió ticket", 'info');
     } finally {
       setIsProcessing(false);
@@ -232,7 +239,6 @@ const App: React.FC = () => {
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-gray-50 pb-24 px-4 overflow-y-auto">
-      {/* Toast Notification Layer */}
       {toast && (
         <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] w-[90%] max-w-sm pointer-events-none animate-in fade-in slide-in-from-top-4 duration-300">
           <div className={`px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border backdrop-blur-md ${
@@ -317,7 +323,6 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Modal de Cámara */}
         {isCameraOpen && (
           <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-4">
             <div className="relative w-full max-w-sm aspect-video bg-gray-900 rounded-2xl overflow-hidden shadow-2xl">
@@ -351,7 +356,7 @@ const App: React.FC = () => {
                   disabled={isScanning}
                   className="w-full py-4 bg-white text-[#bd004d] font-black rounded-2xl shadow-xl active:scale-95 transition-all uppercase tracking-widest text-sm"
                 >
-                  {isScanning ? "Escaneando..." : "Capturar Código"}
+                  {isScanning ? "Procesando Imagen..." : "Capturar Código"}
                 </button>
               )}
               
@@ -400,13 +405,6 @@ const App: React.FC = () => {
                   Compartir
                 </button>
               </div>
-              
-              {copyStatus === 'success' && (
-                <div className="flex items-center justify-center gap-2.5 py-1">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-ping"></div>
-                  <p className="text-[10px] text-green-600 font-black uppercase tracking-widest">¡Listo para compartir!</p>
-                </div>
-              )}
             </div>
           </div>
         )}
