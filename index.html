@@ -68,14 +68,19 @@
     <div id="root"></div>
     <script>
       // Registro resiliente del Service Worker
-      if ('serviceWorker' in navigator) {
+      if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
         window.addEventListener('load', () => {
-          // Usamos una ruta relativa simple para evitar errores 'Invalid URL'.
-          // Si el origen no coincide (común en sandboxes), el catch lo manejará sin romper la app.
+          // Intentamos el registro. En entornos sandbox de desarrollo (como este), 
+          // el navegador lanzará un error de origen cruzado. Es normal y esperado.
           navigator.serviceWorker.register('sw.js')
-            .then(reg => console.log('SW registrado con éxito:', reg.scope))
+            .then(reg => console.log('Modo Offline: Activado'))
             .catch(err => {
-              console.warn('Registro de Service Worker omitido (ambiente de desarrollo):', err.message);
+              // Silenciamos la advertencia si es solo por temas de dominio/sandbox
+              if (!err.message.includes('origin')) {
+                console.warn('SW Status:', err.message);
+              } else {
+                console.log('Modo Offline: No disponible en entorno de pruebas');
+              }
             });
         });
       }
