@@ -75,7 +75,7 @@ const App: React.FC = () => {
   const getTicketBlob = async (): Promise<Blob | null> => {
     if (!ticketRef.current) return null;
     const canvas = await html2canvas(ticketRef.current, { 
-      scale: 2.5, 
+      scale: 3, 
       backgroundColor: '#F9FAFB', 
       useCORS: true,
       logging: false
@@ -88,21 +88,28 @@ const App: React.FC = () => {
     try {
       const blob = await getTicketBlob();
       if (blob) {
-        const file = new File([blob], `Yoshi-${formData.codigo}.png`, { type: 'image/png' });
+        const file = new File([blob], `Yoshi-${formData.codigo || 'ticket'}.png`, { type: 'image/png' });
+        
+        // Intento de compartir nativo (iOS/Android)
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({ 
             files: [file], 
             title: 'Ticket Yoshi Cash',
-            text: `Aquí tienes tu ticket Yoshi Cash: ${formData.codigo}`
+            text: `Ticket generado: ${formData.codigo}`
           });
         } else {
+          // Fallback descarga
           const url = URL.createObjectURL(blob);
-          const a = document.createElement('a'); a.href = url; a.download = `Yoshi-${formData.codigo}.png`; a.click();
+          const a = document.createElement('a'); 
+          a.href = url; 
+          a.download = `Yoshi-${formData.codigo}.png`; 
+          a.click();
           URL.revokeObjectURL(url);
-          showPopMessage("Guardado en descargas", 'success');
+          showPopMessage("Imagen guardada", 'success');
         }
       }
     } catch (e) {
+      console.error(e);
       showPopMessage("Error al compartir", 'error');
     } finally {
       setIsProcessing(false);
@@ -110,7 +117,7 @@ const App: React.FC = () => {
   };
 
   const handleSend = async () => {
-    if (!formData.phone) { showPopMessage("Número requerido", 'info'); return; }
+    if (!formData.phone) { showPopMessage("Ingresa un número", 'info'); return; }
     const phoneToOpen = formData.phone.replace(/\D/g, '');
     setIsProcessing(true);
     try {
@@ -118,7 +125,7 @@ const App: React.FC = () => {
       if (blob && navigator.clipboard?.write) {
         const item = new ClipboardItem({ 'image/png': blob });
         await navigator.clipboard.write([item]);
-        showPopMessage("Copiado. Pégalo en el chat.", 'success');
+        showPopMessage("Copiado. Pégalo en WhatsApp.", 'success');
         setTimeout(() => window.open(`https://wa.me/${phoneToOpen}`, '_blank'), 1000);
       } else {
         window.open(`https://wa.me/${phoneToOpen}`, '_blank');
@@ -185,12 +192,12 @@ const App: React.FC = () => {
                 <input 
                   type="text" name="codigo" value={formData.codigo} onChange={handleInputChange} 
                   className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none lowercase focus:ring-2 focus:ring-[#bd004d]/10 font-bold text-gray-700 transition-all pr-14" 
-                  placeholder="ej: folio-2024" 
+                  placeholder="Código o referencia" 
                 />
                 <button 
                   onClick={() => setIsScannerOpen(true)}
                   className="absolute right-2 p-2.5 text-[#bd004d] hover:bg-gray-100 rounded-xl transition-colors"
-                  title="Escanear con Cámara"
+                  title="Escanear Ticket"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -203,9 +210,9 @@ const App: React.FC = () => {
             <div className="flex gap-3 pt-1">
               <button 
                 onClick={handleGenerate} 
-                className="flex-1 py-4 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_10px_25px_rgba(189,0,77,0.3)] active:scale-95 transition-all text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2"
+                className="flex-1 py-4.5 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_10px_25px_rgba(189,0,77,0.3)] active:scale-95 transition-all text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2"
               >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm13-2h3v2h-3v-2zm-3 0h2v3h-2v-3zm3 3h3v2h-3v-2zm-3 2h2v3h-2v-3zm3 1h3v2h-3v-2zm-3-3h3v2h-3v-2zm6-6h3v2h-3V7z" />
                 </svg>
                 Generar QR
@@ -237,7 +244,7 @@ const App: React.FC = () => {
               <div className="flex flex-col gap-3.5">
                 <button 
                   onClick={handleSend} disabled={isProcessing} 
-                  className="w-full py-4.5 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_15px_35px_rgba(189,0,77,0.35)] active:scale-95 transition-all text-sm uppercase tracking-[0.25em] h-16 flex items-center justify-center gap-3 disabled:opacity-50"
+                  className="w-full py-5 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_15px_35px_rgba(189,0,77,0.35)] active:scale-95 transition-all text-sm uppercase tracking-[0.25em] h-16 flex items-center justify-center gap-3 disabled:opacity-50"
                 >
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.025 3.212l-.545 2.031 2.087-.54c.951.608 2.256.924 3.201.924 3.181 0 5.767-2.586 5.768-5.766.001-3.18-2.585-5.767-5.768-5.767zm3.349 8.232c-.185.518-1.078.938-1.568.997-.455.051-.9-.136-2.891-.959-1.992-.823-3.275-2.854-3.374-2.988-.1-.133-.806-1.072-.806-2.046 0-.974.506-1.453.687-1.651.182-.198.396-.248.528-.248.132 0 .264.001.379.006.121.005.286-.046.446.338.162.384.557 1.357.606 1.456.048.099.08.214.015.343-.065.13-.098.225-.197.34-.099.115-.208.256-.296.346-.099.101-.202.211-.087.408.115.197.51 1.341 1.097 1.863.588.522 1.085.683 1.284.782.199.099.314.083.43-.05.117-.133.504-.585.638-.784.133-.199.268-.166.448-.099.179.066 1.138.536 1.336.635.198.1.33.15.379.233.049.084.049.484-.136 1.002z"/>
@@ -246,7 +253,7 @@ const App: React.FC = () => {
                 </button>
                 <button 
                   onClick={handleShare} disabled={isProcessing} 
-                  className="w-full py-4.5 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_15px_35px_rgba(189,0,77,0.35)] active:scale-95 transition-all text-sm uppercase tracking-[0.25em] h-16 flex items-center justify-center gap-3 disabled:opacity-50"
+                  className="w-full py-5 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_15px_35px_rgba(189,0,77,0.3)] active:scale-95 transition-all text-sm uppercase tracking-[0.25em] h-16 flex items-center justify-center gap-3 disabled:opacity-50"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
