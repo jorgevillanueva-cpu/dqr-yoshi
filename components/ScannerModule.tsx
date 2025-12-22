@@ -30,7 +30,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           videoRef.current.srcObject = mediaStream;
         }
       } catch (err) {
-        showPopMessage("Cámara no disponible. Revisa los permisos.", "error");
+        showPopMessage("Permiso de cámara denegado.", "error");
         onClose();
       }
     };
@@ -47,9 +47,19 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
   const captureFrame = async () => {
     if (!videoRef.current || !canvasRef.current || isScanning) return;
 
+    // Verificar API Key antes de procesar imagen para ahorrar recursos
+    if (window.aistudio) {
+      const hasKey = await window.aistudio.hasSelectedApiKey();
+      if (!hasKey) {
+        showPopMessage("Selecciona una API Key primero", "info");
+        await window.aistudio.openSelectKey();
+        return;
+      }
+    }
+
     const video = videoRef.current;
     if (video.videoWidth === 0 || video.videoHeight === 0) {
-      showPopMessage("Iniciando cámara...", "info");
+      showPopMessage("Cámara cargando...", "info");
       return;
     }
 
@@ -57,7 +67,8 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d', { willReadFrequently: true });
 
-    const MAX_DIMENSION = 800;
+    // Resolución optimizada para 4G/Conexiones lentas (640px es suficiente para OCR de texto claro)
+    const MAX_DIMENSION = 640;
     let width = video.videoWidth;
     let height = video.videoHeight;
 
@@ -78,55 +89,56 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
 
     try {
       context?.drawImage(video, 0, 0, width, height);
-      const base64Image = canvas.toDataURL('image/jpeg', 0.75).split(',')[1];
+      // Calidad 0.5 para reducir peso del paquete de red al mínimo
+      const base64Image = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
 
-      // Creamos la instancia justo antes de usarla para obtener la llave más reciente de process.env.API_KEY
+      // Initialize GoogleGenAI right before making the call using process.env.API_KEY directly
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const result = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: [{
+        contents: {
           parts: [
             { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
-            { text: "Extract any ticket ID, folio, or reference code. List them separated by commas. Plain text only." }
+            { text: "OCR: Extract ticket ID or reference. List only codes separated by commas." }
           ]
-        }],
+        },
         config: {
-          systemInstruction: "You are an OCR tool. Detect alphanumeric reference codes on payment tickets. Be fast and precise.",
+          systemInstruction: "You are a specialized OCR tool for payment receipts. Only return the alphanumeric codes found. If none, return empty.",
           temperature: 0,
         }
       });
 
       const responseText = result.text || "";
       
-      if (!responseText.trim() || responseText.toLowerCase().includes("unable") || responseText.length < 3) {
-        showPopMessage("No se detectó el código. Prueba con más luz.", "info");
+      if (!responseText.trim() || responseText.toLowerCase().includes("unable")) {
+        showPopMessage("No se leyó nada claro. Intenta otro ángulo.", "info");
       } else {
         const found = responseText.split(',')
           .map(s => s.trim().replace(/[^a-zA-Z0-9-]/g, ''))
           .filter(s => s.length >= 4);
         
         if (found.length > 0) {
-          const uniqueFound = Array.from(new Set(found));
-          setResults(uniqueFound);
-          showPopMessage("Ticket leído", "success");
+          setResults(Array.from(new Set(found)));
+          showPopMessage("¡Leído!", "success");
         } else {
           showPopMessage("Acerca más el ticket", "info");
         }
       }
     } catch (err: any) {
-      console.error("OCR Failure:", err);
+      console.error("Critical Scanner Error:", err);
       const msg = err.message || "";
       
-      if (msg.includes("Requested entity was not found") || msg.includes("API_KEY") || msg.includes("403") || msg.includes("401")) {
-        showPopMessage("Configuración de API requerida", "error");
-        if (window.aistudio) {
-          window.aistudio.openSelectKey();
-        }
-      } else if (msg.includes("429") || msg.includes("quota")) {
-        showPopMessage("Límite excedido. Espera un momento.", "error");
+      // Manejo granular de errores para guiar al usuario
+      if (msg.includes("fetch") || msg.includes("NetworkError") || !navigator.onLine) {
+        showPopMessage("Sin Internet o señal débil. Reintenta.", "error");
+      } else if (msg.includes("Requested entity was not found") || msg.includes("403") || msg.includes("401")) {
+        showPopMessage("Error de API Key. Selecciona una válida.", "error");
+        window.aistudio?.openSelectKey();
+      } else if (msg.includes("429")) {
+        showPopMessage("Muchos intentos. Espera 5 segundos.", "error");
       } else {
-        showPopMessage("Error de conexión. Reintenta ahora.", "error");
+        showPopMessage("Error de red. Intenta de nuevo.", "error");
       }
     } finally {
       setIsScanning(false);
@@ -136,33 +148,27 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-in fade-in duration-300">
       <div className="flex-1 relative overflow-hidden">
-        <video 
-          ref={videoRef} 
-          autoPlay 
-          playsInline 
-          muted
-          className="w-full h-full object-cover"
-        />
+        <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
         
         <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
-          <div className="w-[80%] h-56 border-2 border-white/20 rounded-[2.5rem] relative">
-            <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-[#bd004d] rounded-tl-[2rem]"></div>
-            <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-[#bd004d] rounded-tr-[2rem]"></div>
-            <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-[#bd004d] rounded-bl-[2rem]"></div>
-            <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-[#bd004d] rounded-br-[2rem]"></div>
+          <div className="w-[75%] h-52 border-2 border-white/10 rounded-[2rem] relative backdrop-blur-[0.5px]">
+            <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-[#bd004d] rounded-tl-[1.8rem]"></div>
+            <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-[#bd004d] rounded-tr-[1.8rem]"></div>
+            <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-[#bd004d] rounded-bl-[1.8rem]"></div>
+            <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-[#bd004d] rounded-br-[1.8rem]"></div>
             
             {isScanning && (
-              <div className="absolute top-0 left-0 w-full h-1 bg-[#bd004d] shadow-[0_0_15px_#bd004d] animate-[scan_1.5s_infinite]"></div>
+              <div className="absolute top-0 left-0 w-full h-0.5 bg-[#bd004d] shadow-[0_0_15px_#bd004d] animate-[scan_1.2s_infinite]"></div>
             )}
           </div>
-          <p className="text-white/70 font-bold text-[11px] uppercase tracking-[0.3em] mt-8 text-center px-10">
-            Alinea el código en el centro
+          <p className="text-white/50 font-bold text-[10px] uppercase tracking-[0.4em] mt-8 text-center px-12 leading-relaxed">
+            Enfoca el código de barras o folio
           </p>
         </div>
 
         <button 
           onClick={onClose}
-          className="absolute top-8 right-6 p-4 bg-black/40 text-white rounded-full backdrop-blur-md border border-white/10 active:scale-90 transition-transform"
+          className="absolute top-10 right-6 p-4 bg-black/50 text-white rounded-full backdrop-blur-xl border border-white/10 active:scale-90 transition-transform"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
@@ -170,19 +176,19 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
         </button>
       </div>
 
-      <div className="bg-[#080808] p-8 pb-12 rounded-t-[3rem] -mt-10 relative z-10 border-t border-white/5">
+      <div className="bg-[#050505] p-8 pb-14 rounded-t-[3rem] -mt-10 relative z-10 border-t border-white/5 shadow-[0_-20px_50px_rgba(0,0,0,0.8)]">
         {results.length > 0 ? (
           <div className="space-y-6">
             <div className="text-center">
-              <p className="text-[#bd004d] text-[10px] font-black uppercase tracking-widest mb-1">Resultados</p>
-              <p className="text-white/40 text-xs">Selecciona el código correcto</p>
+              <p className="text-[#bd004d] text-[10px] font-black uppercase tracking-widest mb-1">Detectado</p>
+              <p className="text-white/30 text-[11px]">Toca el código para cargarlo</p>
             </div>
-            <div className="flex flex-col gap-3 max-h-56 overflow-y-auto custom-scrollbar pr-1">
+            <div className="flex flex-col gap-3 max-h-48 overflow-y-auto custom-scrollbar">
               {results.map((res, i) => (
                 <button
                   key={i}
                   onClick={() => onCodeSelected(res)}
-                  className="w-full px-6 py-5 bg-white/5 border border-white/10 text-white font-mono uppercase tracking-wider text-left rounded-2xl active:bg-[#bd004d]/20 transition-all"
+                  className="w-full px-6 py-5 bg-white/[0.03] border border-white/10 text-white font-mono uppercase text-center rounded-2xl active:bg-[#bd004d]/30 transition-all border-dashed"
                 >
                   {res}
                 </button>
@@ -190,9 +196,9 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
             </div>
             <button 
               onClick={() => setResults([])}
-              className="w-full py-4 text-white/30 text-[10px] font-black uppercase tracking-widest"
+              className="w-full py-2 text-white/20 text-[9px] font-black uppercase tracking-widest"
             >
-              Escanear de nuevo
+              Volver a intentar
             </button>
           </div>
         ) : (
@@ -200,14 +206,14 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
             <button 
               onClick={captureFrame}
               disabled={isScanning}
-              className={`w-full py-6 rounded-[2rem] font-black text-sm uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-4 ${
-                isScanning ? 'bg-gray-900 text-gray-600 cursor-not-allowed' : 'bg-white text-black active:scale-95'
+              className={`w-full py-6 rounded-2xl font-black text-xs uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-4 ${
+                isScanning ? 'bg-gray-900 text-gray-700' : 'bg-[#bd004d] text-white shadow-lg active:scale-95'
               }`}
             >
               {isScanning ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-gray-600 border-t-transparent rounded-full animate-spin"></div>
-                  Procesando
+                  <div className="w-4 h-4 border-2 border-gray-700 border-t-transparent rounded-full animate-spin"></div>
+                  Subiendo...
                 </>
               ) : (
                 <>
@@ -215,22 +221,14 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  Capturar Código
+                  Capturar Ticket
                 </>
               )}
             </button>
-            <div className="flex flex-col items-center gap-1">
-              <p className="text-white/20 text-[9px] font-bold tracking-widest uppercase text-center">
-                Tecnología de escaneo visual asistido
+            <div className="text-center opacity-20">
+              <p className="text-white text-[8px] font-bold tracking-[0.2em] uppercase">
+                Análisis de imagen optimizado para datos móviles
               </p>
-              <a 
-                href="https://ai.google.dev/gemini-api/docs/billing" 
-                target="_blank" 
-                rel="noreferrer"
-                className="text-[#bd004d]/40 text-[8px] uppercase tracking-widest underline decoration-1"
-              >
-                Información de facturación
-              </a>
             </div>
           </div>
         )}
@@ -239,12 +237,12 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
       <style>{`
         @keyframes scan {
           0% { top: 0%; opacity: 0; }
-          30% { opacity: 1; }
-          70% { opacity: 1; }
+          20% { opacity: 1; }
+          80% { opacity: 1; }
           100% { top: 100%; opacity: 0; }
         }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.05); border-radius: 10px; }
       `}</style>
     </div>
   );
