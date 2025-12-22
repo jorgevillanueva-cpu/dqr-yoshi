@@ -73,8 +73,8 @@ const App: React.FC = () => {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
           facingMode: 'environment', 
-          width: { ideal: 1280 }, 
-          height: { ideal: 720 } 
+          width: { ideal: 1024 }, 
+          height: { ideal: 768 } 
         } 
       });
       if (videoRef.current) {
@@ -82,7 +82,7 @@ const App: React.FC = () => {
         videoRef.current.play();
       }
     } catch (err) {
-      showPopMessage("No se pudo acceder a la cámara. Revisa los permisos.", 'error');
+      showPopMessage("Cámara no disponible. Revisa permisos.", 'error');
       setIsCameraOpen(false);
     }
   };
@@ -101,53 +101,59 @@ const App: React.FC = () => {
     setIsScanning(true);
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const context = canvas.getContext('2d', { willReadFrequently: true });
     
-    // Captura con resolución suficiente para OCR
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    // Asegurar que el video tenga dimensiones antes de capturar
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+        showPopMessage("Cámara inicializando, intenta de nuevo", 'info');
+        setIsScanning(false);
+        return;
+    }
+
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
     
     try {
       context?.drawImage(video, 0, 0, canvas.width, canvas.height);
-      // Calidad 0.7 para balancear peso y legibilidad
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.6); // Bajamos un poco la calidad para mayor velocidad
       const base64Image = dataUrl.split(',')[1];
 
-      if (!base64Image) {
-        throw new Error("No se pudo capturar la imagen.");
-      }
+      if (!base64Image) throw new Error("Base64 capture failed");
 
-      // Inicialización de la API justo antes de usarla
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: {
+        contents: [{
           parts: [
             { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
-            { text: "Extract any unique codes, ticket numbers, or alphanumeric identifiers from this image. Only list the codes found, separated by commas. If no codes are found, respond with 'empty'. Do not include any other text." }
+            { text: "List only the alphanumeric ticket codes found in this image, separated by commas. Respond only with 'empty' if no codes are visible. Do not use markdown." }
           ]
+        }],
+        config: {
+            thinkingConfig: { thinkingBudget: 0 } // Desactivamos el pensamiento para OCR rápido
         }
       });
 
       const textOutput = response.text || "";
-      if (textOutput.toLowerCase().includes('empty')) {
-        showPopMessage("No se detectaron códigos claros", 'info');
+      if (textOutput.toLowerCase().includes('empty') || textOutput.trim() === "") {
+        showPopMessage("No se leyeron códigos claros", 'info');
       } else {
         const results = textOutput.split(',')
           .map(s => s.trim().replace(/[^a-zA-Z0-9-]/g, ''))
-          .filter(s => s.length > 3);
+          .filter(s => s.length >= 4);
         
         if (results.length > 0) {
           setExtractedCodes(results);
-          showPopMessage("Códigos encontrados", 'success');
+          showPopMessage("Lectura exitosa", 'success');
         } else {
-          showPopMessage("No se detectó un formato válido", 'info');
+          showPopMessage("Formato de código no reconocido", 'info');
         }
       }
     } catch (err: any) {
-      console.error("Error OCR:", err);
-      showPopMessage("Error al procesar la imagen con la IA", 'error');
+      console.error("AI OCR Error:", err);
+      const errMsg = err.message?.includes('403') ? "Error de API Key (403)" : "Error al procesar con IA";
+      showPopMessage(errMsg, 'error');
     } finally {
       setIsScanning(false);
     }
@@ -161,7 +167,7 @@ const App: React.FC = () => {
 
   const handleGenerate = () => {
     if (!formData.codigo.trim()) {
-      showPopMessage("Por favor, introduce un código", 'info');
+      showPopMessage("Introduce un código primero", 'info');
       return;
     }
     formatSaldoOnComplete();
@@ -178,7 +184,7 @@ const App: React.FC = () => {
   const getTicketBlob = async (): Promise<Blob | null> => {
     if (!ticketRef.current) return null;
     const canvas = await html2canvas(ticketRef.current, { 
-      scale: 2.5, 
+      scale: 2, 
       backgroundColor: '#F9FAFB', 
       useCORS: true,
       logging: false
@@ -201,11 +207,11 @@ const App: React.FC = () => {
           a.download = `Yoshi-${formData.codigo}.png`; 
           a.click();
           URL.revokeObjectURL(url);
-          showPopMessage("Descarga iniciada", 'success');
+          showPopMessage("Imagen descargada", 'success');
         }
       }
     } catch (e) {
-      showPopMessage("No se pudo compartir", 'info');
+      showPopMessage("Error al compartir", 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -213,7 +219,7 @@ const App: React.FC = () => {
 
   const handleSend = async () => {
     if (!formData.phone) { 
-      showPopMessage("Número de WhatsApp requerido", 'info'); 
+      showPopMessage("WhatsApp requerido", 'info'); 
       return; 
     }
     const phoneToOpen = formData.phone.replace(/\D/g, '');
@@ -221,13 +227,12 @@ const App: React.FC = () => {
     try {
       const blob = await getTicketBlob();
       if (blob && navigator.clipboard?.write) {
-        // Intentamos copiar al portapapeles para que el usuario pueda pegar en WhatsApp
         const item = new ClipboardItem({ 'image/png': blob });
         await navigator.clipboard.write([item]);
-        showPopMessage("Imagen copiada, abre WhatsApp para pegar", 'success');
+        showPopMessage("Imagen copiada, pégala en WhatsApp", 'success');
         setTimeout(() => {
           window.open(`https://wa.me/${phoneToOpen}`, '_blank');
-        }, 1000);
+        }, 1200);
       } else {
         window.open(`https://wa.me/${phoneToOpen}`, '_blank');
       }
@@ -311,7 +316,7 @@ const App: React.FC = () => {
                 onClick={handleGenerate} 
                 className="flex-1 py-3.5 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_10px_25px_rgba(189,0,77,0.3)] active:scale-95 transition-all text-xs uppercase tracking-[0.2em]"
               >
-                Generar
+                Generar Ticket
               </button>
               <button 
                 onClick={handleClear} 
@@ -330,12 +335,12 @@ const App: React.FC = () => {
             <div className="relative w-full max-w-sm aspect-video bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border-2 border-white/10">
               <video ref={videoRef} className="w-full h-full object-cover" playsInline />
               <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none">
-                <div className="w-full h-full border-2 border-[#bd004d] rounded-lg animate-pulse shadow-[0_0_15px_rgba(189,0,77,0.5)]"></div>
+                <div className="w-full h-full border-2 border-[#bd004d] rounded-lg animate-pulse"></div>
               </div>
               {isScanning && (
-                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-4">
-                  <div className="w-10 h-10 border-4 border-[#bd004d] border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-white font-black text-[10px] uppercase tracking-widest">Leyendo Imagen...</span>
+                <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4">
+                  <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-white font-black text-[10px] uppercase tracking-widest animate-pulse">Analizando...</span>
                 </div>
               )}
             </div>
@@ -343,7 +348,7 @@ const App: React.FC = () => {
             <div className="w-full max-w-sm mt-8 flex flex-col gap-4">
               {extractedCodes.length > 0 ? (
                 <div className="bg-white rounded-3xl p-6 max-h-56 overflow-y-auto shadow-2xl animate-in slide-in-from-bottom-4">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Selecciona el código:</p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Códigos detectados:</p>
                   <div className="flex flex-wrap gap-2.5">
                     {extractedCodes.map((code, idx) => (
                       <button 
@@ -368,7 +373,7 @@ const App: React.FC = () => {
               
               <button 
                 onClick={stopCamera}
-                className="w-full py-3 text-white/50 font-bold uppercase tracking-widest text-xs hover:text-white transition-colors"
+                className="w-full py-3 text-white/50 font-bold uppercase tracking-widest text-xs"
               >
                 Cerrar Cámara
               </button>
@@ -383,14 +388,14 @@ const App: React.FC = () => {
             
             <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 space-y-6">
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2.5 ml-1">Enviar a WhatsApp</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2.5 ml-1">Número de WhatsApp</label>
                 <input 
                   type="tel" 
                   name="phone" 
                   value={formData.phone} 
                   onChange={handleInputChange} 
                   className="w-full px-6 py-4.5 bg-gray-50 border-none rounded-2xl outline-none font-black text-gray-700 focus:ring-2 focus:ring-[#bd004d]/10 transition-all" 
-                  placeholder="Ej: 521..." 
+                  placeholder="521..." 
                 />
               </div>
               
@@ -398,20 +403,17 @@ const App: React.FC = () => {
                 <button 
                   onClick={handleSend} 
                   disabled={isProcessing} 
-                  className="w-full py-4 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_15px_35px_rgba(189,0,77,0.35)] active:scale-95 transition-all text-sm uppercase tracking-[0.25em] disabled:opacity-50 h-16 flex items-center justify-center gap-3"
+                  className="w-full py-4 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_15px_35px_rgba(189,0,77,0.35)] active:scale-95 transition-all text-sm uppercase tracking-[0.25em] h-16 flex items-center justify-center gap-3 disabled:opacity-50"
                 >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.414 0 .018 5.394 0 12.03c0 2.122.554 4.197 1.607 6.037L0 24l6.105-1.602a11.834 11.834 0 005.937 1.604h.005c6.631 0 12.026-5.398 12.03-12.033a11.85 11.85 0 00-3.527-8.508z"/>
-                  </svg>
-                  {isProcessing ? "Procesando..." : "Enviar a WhatsApp"}
+                  Enviar por WhatsApp
                 </button>
                 
                 <button 
                   onClick={handleShare} 
                   disabled={isProcessing} 
-                  className="w-full py-4 bg-gray-100 text-[#bd004d] font-black rounded-2xl active:scale-95 transition-all text-sm uppercase tracking-[0.25em] disabled:opacity-50 h-16"
+                  className="w-full py-4 bg-gray-100 text-[#bd004d] font-black rounded-2xl active:scale-95 transition-all text-sm uppercase tracking-[0.25em] h-16 disabled:opacity-50"
                 >
-                  Descargar Imagen
+                  Descargar Ticket
                 </button>
               </div>
             </div>
