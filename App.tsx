@@ -13,7 +13,6 @@ const App: React.FC = () => {
   });
   const [showPreview, setShowPreview] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [copyStatus, setCopyStatus] = useState<'idle' | 'copying' | 'success' | 'error'>('idle');
   
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
 
@@ -74,8 +73,8 @@ const App: React.FC = () => {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
           facingMode: 'environment', 
-          width: { ideal: 1024 }, 
-          height: { ideal: 768 } 
+          width: { ideal: 1280 }, 
+          height: { ideal: 720 } 
         } 
       });
       if (videoRef.current) {
@@ -104,46 +103,51 @@ const App: React.FC = () => {
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d', { willReadFrequently: true });
     
-    // Captura a resolución moderada
-    canvas.width = video.videoWidth || 1024;
-    canvas.height = video.videoHeight || 768;
+    // Captura con resolución suficiente para OCR
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
     
     try {
       context?.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      // Calidad 0.7 para balancear peso y legibilidad
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
       const base64Image = dataUrl.split(',')[1];
 
       if (!base64Image) {
-        throw new Error("No se pudo capturar la imagen correctamente.");
+        throw new Error("No se pudo capturar la imagen.");
       }
 
-      // Inicializar AI justo antes de la llamada
+      // Inicialización de la API justo antes de usarla
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: [{
+        contents: {
           parts: [
             { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
-            { text: "Extract any ticket IDs, reference numbers, or alphanumeric codes from this image. Only return the codes separated by commas. Do not include any other text or explanation." }
+            { text: "Extract any unique codes, ticket numbers, or alphanumeric identifiers from this image. Only list the codes found, separated by commas. If no codes are found, respond with 'empty'. Do not include any other text." }
           ]
-        }]
+        }
       });
 
-      const text = response.text || "";
-      const results = text.split(',')
-        .map(s => s.trim().replace(/[^a-zA-Z0-9-]/g, ''))
-        .filter(s => s.length > 4);
-      
-      if (results.length > 0) {
-        setExtractedCodes(results);
-        showPopMessage("Códigos detectados", 'success');
+      const textOutput = response.text || "";
+      if (textOutput.toLowerCase().includes('empty')) {
+        showPopMessage("No se detectaron códigos claros", 'info');
       } else {
-        showPopMessage("No se encontraron códigos claros", 'info');
+        const results = textOutput.split(',')
+          .map(s => s.trim().replace(/[^a-zA-Z0-9-]/g, ''))
+          .filter(s => s.length > 3);
+        
+        if (results.length > 0) {
+          setExtractedCodes(results);
+          showPopMessage("Códigos encontrados", 'success');
+        } else {
+          showPopMessage("No se detectó un formato válido", 'info');
+        }
       }
     } catch (err: any) {
-      console.error("Error detallado OCR:", err);
-      showPopMessage("Error al procesar la imagen", 'error');
+      console.error("Error OCR:", err);
+      showPopMessage("Error al procesar la imagen con la IA", 'error');
     } finally {
       setIsScanning(false);
     }
@@ -174,7 +178,7 @@ const App: React.FC = () => {
   const getTicketBlob = async (): Promise<Blob | null> => {
     if (!ticketRef.current) return null;
     const canvas = await html2canvas(ticketRef.current, { 
-      scale: 3, 
+      scale: 2.5, 
       backgroundColor: '#F9FAFB', 
       useCORS: true,
       logging: false
@@ -201,8 +205,7 @@ const App: React.FC = () => {
         }
       }
     } catch (e) {
-      console.log("Acción de compartir cancelada.");
-      showPopMessage("no se compartió ticket", 'info');
+      showPopMessage("No se pudo compartir", 'info');
     } finally {
       setIsProcessing(false);
     }
@@ -215,25 +218,21 @@ const App: React.FC = () => {
     }
     const phoneToOpen = formData.phone.replace(/\D/g, '');
     setIsProcessing(true);
-    setCopyStatus('copying');
     try {
       const blob = await getTicketBlob();
       if (blob && navigator.clipboard?.write) {
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-        setCopyStatus('success');
-        showPopMessage("Imagen copiada, abriendo WhatsApp", 'success');
+        // Intentamos copiar al portapapeles para que el usuario pueda pegar en WhatsApp
+        const item = new ClipboardItem({ 'image/png': blob });
+        await navigator.clipboard.write([item]);
+        showPopMessage("Imagen copiada, abre WhatsApp para pegar", 'success');
         setTimeout(() => {
           window.open(`https://wa.me/${phoneToOpen}`, '_blank');
-          setCopyStatus('idle');
-          setFormData(prev => ({ ...prev, phone: '' }));
-        }, 800);
+        }, 1000);
       } else {
         window.open(`https://wa.me/${phoneToOpen}`, '_blank');
-        setFormData(prev => ({ ...prev, phone: '' }));
       }
     } catch (e) {
       window.open(`https://wa.me/${phoneToOpen}`, '_blank');
-      setFormData(prev => ({ ...prev, phone: '' }));
     } finally {
       setIsProcessing(false);
     }
@@ -260,14 +259,14 @@ const App: React.FC = () => {
           <YoshiLogo className="h-14 w-14" />
         </div>
         <h1 className="text-2xl font-extrabold text-gray-900 font-title tracking-tight">Digitalizador QR</h1>
-        <p className="text-[#bd004d] font-black uppercase tracking-widest text-[10px] mt-1">Yoshi Cash</p>
+        <p className="text-[#bd004d] font-black uppercase tracking-widest text-[10px] mt-1">Yoshi Cash Official</p>
       </header>
 
       <div className="space-y-6">
         <div className="bg-white rounded-[2.5rem] p-7 shadow-xl border border-gray-100">
           <div className="space-y-6">
             <div>
-              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">Saldo Actual (Opcional)</label>
+              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">Saldo (Opcional)</label>
               <div className="relative">
                 <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
                 <input 
@@ -297,6 +296,7 @@ const App: React.FC = () => {
                 <button 
                   onClick={startCamera}
                   className="absolute right-2 p-2.5 text-[#bd004d] hover:bg-gray-100 rounded-xl transition-colors"
+                  aria-label="Escanear con cámara"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -311,7 +311,7 @@ const App: React.FC = () => {
                 onClick={handleGenerate} 
                 className="flex-1 py-3.5 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_10px_25px_rgba(189,0,77,0.3)] active:scale-95 transition-all text-xs uppercase tracking-[0.2em]"
               >
-                Generar Ticket
+                Generar
               </button>
               <button 
                 onClick={handleClear} 
@@ -327,25 +327,29 @@ const App: React.FC = () => {
 
         {isCameraOpen && (
           <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-4">
-            <div className="relative w-full max-w-sm aspect-video bg-gray-900 rounded-2xl overflow-hidden shadow-2xl">
+            <div className="relative w-full max-w-sm aspect-video bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border-2 border-white/10">
               <video ref={videoRef} className="w-full h-full object-cover" playsInline />
+              <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none">
+                <div className="w-full h-full border-2 border-[#bd004d] rounded-lg animate-pulse shadow-[0_0_15px_rgba(189,0,77,0.5)]"></div>
+              </div>
               {isScanning && (
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                  <div className="w-8 h-8 border-4 border-[#bd004d] border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-4">
+                  <div className="w-10 h-10 border-4 border-[#bd004d] border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-white font-black text-[10px] uppercase tracking-widest">Leyendo Imagen...</span>
                 </div>
               )}
             </div>
             
-            <div className="w-full max-w-sm mt-6 flex flex-col gap-4">
+            <div className="w-full max-w-sm mt-8 flex flex-col gap-4">
               {extractedCodes.length > 0 ? (
-                <div className="bg-white rounded-2xl p-4 max-h-48 overflow-y-auto shadow-lg">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Resultados detectados:</p>
-                  <div className="flex flex-wrap gap-2">
+                <div className="bg-white rounded-3xl p-6 max-h-56 overflow-y-auto shadow-2xl animate-in slide-in-from-bottom-4">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Selecciona el código:</p>
+                  <div className="flex flex-wrap gap-2.5">
                     {extractedCodes.map((code, idx) => (
                       <button 
                         key={idx}
                         onClick={() => selectCode(code)}
-                        className="px-4 py-2 bg-[#bd004d]/5 border border-[#bd004d]/20 rounded-lg text-[#bd004d] font-bold text-sm"
+                        className="px-5 py-2.5 bg-[#bd004d]/5 border border-[#bd004d]/20 rounded-xl text-[#bd004d] font-bold text-sm hover:bg-[#bd004d] hover:text-white transition-all"
                       >
                         {code}
                       </button>
@@ -356,17 +360,17 @@ const App: React.FC = () => {
                 <button 
                   onClick={captureAndExtract}
                   disabled={isScanning}
-                  className="w-full py-4 bg-white text-[#bd004d] font-black rounded-2xl shadow-xl active:scale-95 transition-all uppercase tracking-widest text-sm"
+                  className="w-full py-5 bg-white text-[#bd004d] font-black rounded-2xl shadow-xl active:scale-95 transition-all uppercase tracking-widest text-sm disabled:opacity-50"
                 >
-                  {isScanning ? "Procesando Imagen..." : "Capturar Código"}
+                  {isScanning ? "Procesando..." : "Capturar Foto"}
                 </button>
               )}
               
               <button 
                 onClick={stopCamera}
-                className="w-full py-3 text-white/60 font-bold uppercase tracking-widest text-xs"
+                className="w-full py-3 text-white/50 font-bold uppercase tracking-widest text-xs hover:text-white transition-colors"
               >
-                Cancelar
+                Cerrar Cámara
               </button>
             </div>
             <canvas ref={canvasRef} className="hidden" />
@@ -379,7 +383,7 @@ const App: React.FC = () => {
             
             <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 space-y-6">
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2.5 ml-1">WhatsApp del Cliente</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2.5 ml-1">Enviar a WhatsApp</label>
                 <input 
                   type="tel" 
                   name="phone" 
@@ -394,17 +398,20 @@ const App: React.FC = () => {
                 <button 
                   onClick={handleSend} 
                   disabled={isProcessing} 
-                  className="w-full py-4 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_15px_35px_rgba(189,0,77,0.35)] active:scale-95 transition-all text-sm uppercase tracking-[0.25em] disabled:opacity-50 h-16"
+                  className="w-full py-4 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_15px_35px_rgba(189,0,77,0.35)] active:scale-95 transition-all text-sm uppercase tracking-[0.25em] disabled:opacity-50 h-16 flex items-center justify-center gap-3"
                 >
-                  {isProcessing ? "Procesando..." : "Enviar"}
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.414 0 .018 5.394 0 12.03c0 2.122.554 4.197 1.607 6.037L0 24l6.105-1.602a11.834 11.834 0 005.937 1.604h.005c6.631 0 12.026-5.398 12.03-12.033a11.85 11.85 0 00-3.527-8.508z"/>
+                  </svg>
+                  {isProcessing ? "Procesando..." : "Enviar a WhatsApp"}
                 </button>
                 
                 <button 
                   onClick={handleShare} 
                   disabled={isProcessing} 
-                  className="w-full py-4 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_15px_35px_rgba(189,0,77,0.35)] active:scale-95 transition-all text-sm uppercase tracking-[0.25em] disabled:opacity-50 h-16"
+                  className="w-full py-4 bg-gray-100 text-[#bd004d] font-black rounded-2xl active:scale-95 transition-all text-sm uppercase tracking-[0.25em] disabled:opacity-50 h-16"
                 >
-                  Compartir
+                  Descargar Imagen
                 </button>
               </div>
             </div>
