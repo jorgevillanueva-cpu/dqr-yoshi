@@ -57,7 +57,6 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d', { willReadFrequently: true });
 
-    // Reducimos a 800px para mayor velocidad en móviles y evitar cortes de conexión
     const MAX_DIMENSION = 800;
     let width = video.videoWidth;
     let height = video.videoHeight;
@@ -81,10 +80,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
       context?.drawImage(video, 0, 0, width, height);
       const base64Image = canvas.toDataURL('image/jpeg', 0.75).split(',')[1];
 
-      if (!process.env.API_KEY) {
-        throw new Error("API_KEY_MISSING");
-      }
-
+      // Creamos la instancia justo antes de usarla para obtener la llave más reciente de process.env.API_KEY
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const result = await ai.models.generateContent({
@@ -122,12 +118,13 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
       console.error("OCR Failure:", err);
       const msg = err.message || "";
       
-      if (msg.includes("429") || msg.includes("quota")) {
-        showPopMessage("Demasiados intentos. Espera un momento.", "error");
-      } else if (msg.includes("API_KEY_MISSING")) {
-        showPopMessage("Error de configuración (API Key).", "error");
-      } else if (msg.includes("400") || msg.includes("INVALID")) {
-        showPopMessage("Error en el formato de imagen.", "error");
+      if (msg.includes("Requested entity was not found") || msg.includes("API_KEY") || msg.includes("403") || msg.includes("401")) {
+        showPopMessage("Configuración de API requerida", "error");
+        if (window.aistudio) {
+          window.aistudio.openSelectKey();
+        }
+      } else if (msg.includes("429") || msg.includes("quota")) {
+        showPopMessage("Límite excedido. Espera un momento.", "error");
       } else {
         showPopMessage("Error de conexión. Reintenta ahora.", "error");
       }
@@ -222,9 +219,19 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
                 </>
               )}
             </button>
-            <p className="text-white/20 text-[9px] font-bold tracking-widest uppercase text-center">
-              Tecnología de escaneo visual asistido
-            </p>
+            <div className="flex flex-col items-center gap-1">
+              <p className="text-white/20 text-[9px] font-bold tracking-widest uppercase text-center">
+                Tecnología de escaneo visual asistido
+              </p>
+              <a 
+                href="https://ai.google.dev/gemini-api/docs/billing" 
+                target="_blank" 
+                rel="noreferrer"
+                className="text-[#bd004d]/40 text-[8px] uppercase tracking-widest underline decoration-1"
+              >
+                Información de facturación
+              </a>
+            </div>
           </div>
         )}
       </div>

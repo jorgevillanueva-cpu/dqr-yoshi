@@ -5,6 +5,18 @@ import { ScannerModule } from './components/ScannerModule';
 import { TicketData } from './types';
 import html2canvas from 'html2canvas';
 
+// Extensión de tipos para window
+declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+  interface Window {
+    // Usar el tipo AIStudio y marcar como readonly para coincidir con la declaración del entorno
+    readonly aistudio: AIStudio;
+  }
+}
+
 const App: React.FC = () => {
   const [formData, setFormData] = useState<TicketData>({
     saldo: '',
@@ -27,6 +39,17 @@ const App: React.FC = () => {
 
   const showPopMessage = (message: string, type: 'error' | 'success' | 'info' = 'info') => {
     setToast({ message, type });
+  };
+
+  const handleOpenKeySelector = async () => {
+    try {
+      if (window.aistudio) {
+        await window.aistudio.openSelectKey();
+        showPopMessage("Llave configurada", 'success');
+      }
+    } catch (e) {
+      showPopMessage("No se pudo abrir el selector", 'error');
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,7 +113,6 @@ const App: React.FC = () => {
       if (blob) {
         const file = new File([blob], `Yoshi-${formData.codigo || 'ticket'}.png`, { type: 'image/png' });
         
-        // Intento de compartir nativo (iOS/Android)
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({ 
             files: [file], 
@@ -98,7 +120,6 @@ const App: React.FC = () => {
             text: `Ticket generado: ${formData.codigo}`
           });
         } else {
-          // Fallback descarga
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a'); 
           a.href = url; 
@@ -109,7 +130,6 @@ const App: React.FC = () => {
         }
       }
     } catch (e) {
-      console.error(e);
       showPopMessage("Error al compartir", 'error');
     } finally {
       setIsProcessing(false);
@@ -162,7 +182,17 @@ const App: React.FC = () => {
         />
       )}
 
-      <header className="py-10 text-center flex flex-col items-center">
+      <header className="py-10 text-center flex flex-col items-center relative">
+        <button 
+          onClick={handleOpenKeySelector}
+          className="absolute top-4 right-0 p-3 text-gray-400 hover:text-[#bd004d] transition-colors"
+          title="Configurar API Key"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+          </svg>
+        </button>
+
         <div className="bg-white p-4 rounded-3xl shadow-md mb-4 border border-gray-100/50">
           <YoshiLogo className="h-14 w-14" />
         </div>
