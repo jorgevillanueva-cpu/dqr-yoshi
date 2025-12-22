@@ -12,8 +12,8 @@ declare global {
     openSelectKey: () => Promise<void>;
   }
   interface Window {
-    // Remove readonly to avoid interface merging issues with environmental declarations
-    aistudio: AIStudio;
+    // Add readonly modifier to match the environment's internal Window declaration
+    readonly aistudio: AIStudio;
   }
 }
 
