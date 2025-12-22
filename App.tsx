@@ -1,9 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { TicketPreview, YoshiLogo } from './components/TicketPreview';
+import { ScannerModule } from './components/ScannerModule';
 import { TicketData } from './types';
 import html2canvas from 'html2canvas';
-import { GoogleGenAI } from "@google/genai";
 
 const App: React.FC = () => {
   const [formData, setFormData] = useState<TicketData>({
@@ -13,22 +13,14 @@ const App: React.FC = () => {
   });
   const [showPreview, setShowPreview] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
 
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [extractedCodes, setExtractedCodes] = useState<string[]>([]);
-
   const ticketRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (toast) {
-      const timer = setTimeout(() => {
-        setToast(null);
-      }, 3500);
+      const timer = setTimeout(() => setToast(null), 3500);
       return () => clearTimeout(timer);
     }
   }, [toast]);
@@ -37,19 +29,17 @@ const App: React.FC = () => {
     setToast({ message, type });
   };
 
-  const formatWithCommas = (value: string) => {
-    const cleanValue = value.replace(/[^\d.]/g, '');
-    const parts = cleanValue.split('.');
-    if (parts.length > 2) return formData.saldo;
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    return parts.join('.');
-  };
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     let processedValue = value;
     if (name === 'codigo') processedValue = value.toLowerCase();
-    else if (name === 'saldo') processedValue = formatWithCommas(value);
+    else if (name === 'saldo') {
+      const clean = value.replace(/[^\d.]/g, '');
+      const parts = clean.split('.');
+      if (parts.length > 2) return;
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      processedValue = parts.join('.');
+    }
     setFormData(prev => ({ ...prev, [name]: processedValue }));
   };
 
@@ -66,125 +56,26 @@ const App: React.FC = () => {
     setFormData(prev => ({ ...prev, saldo: value }));
   };
 
-  const startCamera = async () => {
-    setIsCameraOpen(true);
-    setExtractedCodes([]);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'environment', 
-          width: { ideal: 800 }, 
-          height: { ideal: 600 } 
-        } 
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-    } catch (err) {
-      showPopMessage("Activa el permiso de cámara en tu navegador", 'error');
-      setIsCameraOpen(false);
-    }
-  };
-
-  const stopCamera = () => {
-    if (videoRef.current?.srcObject) {
-      (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
-    }
-    setIsCameraOpen(false);
-    setIsScanning(false);
-  };
-
-  const captureAndExtract = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    
-    setIsScanning(true);
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    
-    if (video.videoWidth === 0) {
-        showPopMessage("Cámara no lista, reintenta", 'info');
-        setIsScanning(false);
-        return;
-    }
-
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    // Usamos una resolución fija moderada para asegurar que el base64 sea ligero
-    canvas.width = 800;
-    canvas.height = (video.videoHeight / video.videoWidth) * 800;
-    
-    try {
-      context?.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
-      const base64Image = dataUrl.split(',')[1];
-
-      if (!base64Image) throw new Error("Captura fallida");
-
-      // Usar GoogleGenAI con la clave de entorno
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: {
-          parts: [
-            { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
-            { text: "Extract alphanumeric ticket codes from this image. Return ONLY the codes separated by commas. If none, return 'none'." }
-          ]
-        }
-      });
-
-      const textOutput = response.text || "";
-      if (textOutput.toLowerCase().includes('none') || !textOutput.trim()) {
-        showPopMessage("No se encontró ningún código", 'info');
-      } else {
-        const results = textOutput.split(',')
-          .map(s => s.trim().replace(/[^a-zA-Z0-9-]/g, ''))
-          .filter(s => s.length >= 4);
-        
-        if (results.length > 0) {
-          setExtractedCodes(results);
-          showPopMessage("¡Escaneo exitoso!", 'success');
-        } else {
-          showPopMessage("Código detectado muy corto", 'info');
-        }
-      }
-    } catch (err: any) {
-      console.error("Detalle del error IA:", err);
-      let friendlyError = "Error de conexión con la IA";
-      if (err.message?.includes('403')) friendlyError = "Clave de API no válida o restringida";
-      if (err.message?.includes('429')) friendlyError = "Demasiadas peticiones, espera un momento";
-      showPopMessage(friendlyError, 'error');
-    } finally {
-      setIsScanning(false);
-    }
-  };
-
-  const selectCode = (code: string) => {
-    setFormData(prev => ({ ...prev, codigo: code.toLowerCase() }));
-    stopCamera();
-    showPopMessage("Código aplicado", 'success');
-  };
-
   const handleGenerate = () => {
     if (!formData.codigo.trim()) {
-      showPopMessage("El código es obligatorio", 'info');
+      showPopMessage("Ingresa Código de Ticket", 'info');
       return;
     }
     formatSaldoOnComplete();
     setShowPreview(true);
-    showPopMessage("Ticket listo", 'success');
+    showPopMessage("Ticket generado", 'success');
   };
 
   const handleClear = () => {
     setFormData({ saldo: '', codigo: '', phone: '' });
     setShowPreview(false);
-    showPopMessage("Formulario reseteado");
+    showPopMessage("Reseteado con éxito");
   };
 
   const getTicketBlob = async (): Promise<Blob | null> => {
     if (!ticketRef.current) return null;
     const canvas = await html2canvas(ticketRef.current, { 
-      scale: 2, 
+      scale: 2.5, 
       backgroundColor: '#F9FAFB', 
       useCORS: true,
       logging: false
@@ -197,31 +88,29 @@ const App: React.FC = () => {
     try {
       const blob = await getTicketBlob();
       if (blob) {
-        const file = new File([blob], `Ticket-${formData.codigo}.png`, { type: 'image/png' });
+        const file = new File([blob], `Yoshi-${formData.codigo}.png`, { type: 'image/png' });
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: 'Tu Ticket Yoshi' });
+          await navigator.share({ 
+            files: [file], 
+            title: 'Ticket Yoshi Cash',
+            text: `Aquí tienes tu ticket Yoshi Cash: ${formData.codigo}`
+          });
         } else {
           const url = URL.createObjectURL(blob);
-          const a = document.createElement('a'); 
-          a.href = url; 
-          a.download = `Ticket-${formData.codigo}.png`; 
-          a.click();
+          const a = document.createElement('a'); a.href = url; a.download = `Yoshi-${formData.codigo}.png`; a.click();
           URL.revokeObjectURL(url);
-          showPopMessage("Ticket guardado en descargas", 'success');
+          showPopMessage("Guardado en descargas", 'success');
         }
       }
     } catch (e) {
-      showPopMessage("Error al procesar imagen", 'error');
+      showPopMessage("Error al compartir", 'error');
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleSend = async () => {
-    if (!formData.phone) { 
-      showPopMessage("Escribe el número de WhatsApp", 'info'); 
-      return; 
-    }
+    if (!formData.phone) { showPopMessage("Número requerido", 'info'); return; }
     const phoneToOpen = formData.phone.replace(/\D/g, '');
     setIsProcessing(true);
     try {
@@ -229,10 +118,8 @@ const App: React.FC = () => {
       if (blob && navigator.clipboard?.write) {
         const item = new ClipboardItem({ 'image/png': blob });
         await navigator.clipboard.write([item]);
-        showPopMessage("Imagen copiada. Pégala en el chat.", 'success');
-        setTimeout(() => {
-          window.open(`https://wa.me/${phoneToOpen}`, '_blank');
-        }, 1000);
+        showPopMessage("Copiado. Pégalo en el chat.", 'success');
+        setTimeout(() => window.open(`https://wa.me/${phoneToOpen}`, '_blank'), 1000);
       } else {
         window.open(`https://wa.me/${phoneToOpen}`, '_blank');
       }
@@ -252,19 +139,28 @@ const App: React.FC = () => {
             toast.type === 'success' ? 'bg-[#bd004d]/90 border-[#bd004d]/30 text-white' : 
             'bg-gray-900/90 border-gray-700 text-white'
           }`}>
-            <div className="flex-1 text-sm font-bold tracking-tight">
-              {toast.message}
-            </div>
+            <div className="flex-1 text-sm font-bold tracking-tight">{toast.message}</div>
           </div>
         </div>
+      )}
+
+      {isScannerOpen && (
+        <ScannerModule 
+          onClose={() => setIsScannerOpen(false)}
+          showPopMessage={showPopMessage}
+          onCodeSelected={(code) => {
+            setFormData(prev => ({ ...prev, codigo: code.toLowerCase() }));
+            setIsScannerOpen(false);
+          }}
+        />
       )}
 
       <header className="py-10 text-center flex flex-col items-center">
         <div className="bg-white p-4 rounded-3xl shadow-md mb-4 border border-gray-100/50">
           <YoshiLogo className="h-14 w-14" />
         </div>
-        <h1 className="text-2xl font-extrabold text-gray-900 font-title tracking-tight">Yoshi Digital</h1>
-        <p className="text-[#bd004d] font-black uppercase tracking-widest text-[10px] mt-1">Digitalizador de Tickets</p>
+        <h1 className="text-2xl font-extrabold text-gray-900 font-title tracking-tight">Yoshi Cash</h1>
+        <p className="text-[#bd004d] font-black uppercase tracking-widest text-[10px] mt-1">Digitalizador de QR</p>
       </header>
 
       <div className="space-y-6">
@@ -275,12 +171,8 @@ const App: React.FC = () => {
               <div className="relative">
                 <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
                 <input 
-                  type="text" 
-                  name="saldo" 
-                  value={formData.saldo} 
-                  onChange={handleInputChange} 
-                  onBlur={formatSaldoOnComplete} 
-                  inputMode="decimal"
+                  type="text" name="saldo" value={formData.saldo} 
+                  onChange={handleInputChange} onBlur={formatSaldoOnComplete} inputMode="decimal"
                   className="w-full pl-10 pr-5 py-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[#bd004d]/10 font-bold text-gray-700 transition-all" 
                   placeholder="0.00" 
                 />
@@ -288,19 +180,17 @@ const App: React.FC = () => {
             </div>
             
             <div>
-              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">Código de Referencia</label>
+              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">Ticket</label>
               <div className="relative flex items-center">
                 <input 
-                  type="text" 
-                  name="codigo" 
-                  value={formData.codigo} 
-                  onChange={handleInputChange} 
+                  type="text" name="codigo" value={formData.codigo} onChange={handleInputChange} 
                   className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none lowercase focus:ring-2 focus:ring-[#bd004d]/10 font-bold text-gray-700 transition-all pr-14" 
-                  placeholder="ej: ab12345" 
+                  placeholder="ej: folio-2024" 
                 />
                 <button 
-                  onClick={startCamera}
+                  onClick={() => setIsScannerOpen(true)}
                   className="absolute right-2 p-2.5 text-[#bd004d] hover:bg-gray-100 rounded-xl transition-colors"
+                  title="Escanear con Cámara"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -313,9 +203,12 @@ const App: React.FC = () => {
             <div className="flex gap-3 pt-1">
               <button 
                 onClick={handleGenerate} 
-                className="flex-1 py-4 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_10px_25px_rgba(189,0,77,0.3)] active:scale-95 transition-all text-xs uppercase tracking-[0.2em]"
+                className="flex-1 py-4 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_10px_25px_rgba(189,0,77,0.3)] active:scale-95 transition-all text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2"
               >
-                Generar Ticket
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm13-2h3v2h-3v-2zm-3 0h2v3h-2v-3zm3 3h3v2h-3v-2zm-3 2h2v3h-2v-3zm3 1h3v2h-3v-2zm-3-3h3v2h-3v-2zm6-6h3v2h-3V7z" />
+                </svg>
+                Generar QR
               </button>
               <button 
                 onClick={handleClear} 
@@ -329,90 +222,36 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {isCameraOpen && (
-          <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-4">
-            <div className="relative w-full max-w-sm aspect-[4/3] bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border-2 border-white/20">
-              <video ref={videoRef} className="w-full h-full object-cover" playsInline />
-              <div className="absolute inset-0 border-[30px] border-black/30 pointer-events-none">
-                <div className="w-full h-full border-2 border-[#bd004d] rounded-lg animate-pulse shadow-[0_0_20px_rgba(189,0,77,0.4)]"></div>
-              </div>
-              {isScanning && (
-                <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-4">
-                  <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-white font-black text-[10px] uppercase tracking-[0.3em] animate-pulse">Analizando...</span>
-                </div>
-              )}
-            </div>
-            
-            <div className="w-full max-w-sm mt-8 flex flex-col gap-4 px-2">
-              {extractedCodes.length > 0 ? (
-                <div className="bg-white rounded-3xl p-6 max-h-56 overflow-y-auto shadow-2xl animate-in slide-in-from-bottom-6">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Pulsa un código para usarlo:</p>
-                  <div className="flex flex-wrap gap-2.5">
-                    {extractedCodes.map((code, idx) => (
-                      <button 
-                        key={idx}
-                        onClick={() => selectCode(code)}
-                        className="px-5 py-3 bg-[#bd004d]/5 border border-[#bd004d]/20 rounded-xl text-[#bd004d] font-bold text-sm hover:bg-[#bd004d] hover:text-white transition-all shadow-sm"
-                      >
-                        {code}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <button 
-                  onClick={captureAndExtract}
-                  disabled={isScanning}
-                  className="w-full py-5 bg-white text-[#bd004d] font-black rounded-2xl shadow-xl active:scale-95 transition-all uppercase tracking-widest text-sm disabled:opacity-50"
-                >
-                  {isScanning ? "Esperando respuesta..." : "Capturar Foto"}
-                </button>
-              )}
-              
-              <button 
-                onClick={stopCamera}
-                className="w-full py-3 text-white/40 font-bold uppercase tracking-widest text-[10px]"
-              >
-                Cerrar Escáner
-              </button>
-            </div>
-            <canvas ref={canvasRef} className="hidden" />
-          </div>
-        )}
-
         {showPreview && (
           <div className="space-y-6 pb-20 animate-in fade-in zoom-in-95 duration-500">
             <TicketPreview data={formData} innerRef={ticketRef} />
-            
             <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 space-y-6">
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2.5 ml-1">WhatsApp del Cliente</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2.5 ml-1">WhatsApp de Envío</label>
                 <input 
-                  type="tel" 
-                  name="phone" 
-                  value={formData.phone} 
-                  onChange={handleInputChange} 
+                  type="tel" name="phone" value={formData.phone} onChange={handleInputChange} 
                   className="w-full px-6 py-4.5 bg-gray-50 border-none rounded-2xl outline-none font-black text-gray-700 focus:ring-2 focus:ring-[#bd004d]/10 transition-all" 
                   placeholder="521..." 
                 />
               </div>
-              
               <div className="flex flex-col gap-3.5">
                 <button 
-                  onClick={handleSend} 
-                  disabled={isProcessing} 
+                  onClick={handleSend} disabled={isProcessing} 
                   className="w-full py-4.5 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_15px_35px_rgba(189,0,77,0.35)] active:scale-95 transition-all text-sm uppercase tracking-[0.25em] h-16 flex items-center justify-center gap-3 disabled:opacity-50"
                 >
-                  Enviar a WhatsApp
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.025 3.212l-.545 2.031 2.087-.54c.951.608 2.256.924 3.201.924 3.181 0 5.767-2.586 5.768-5.766.001-3.18-2.585-5.767-5.768-5.767zm3.349 8.232c-.185.518-1.078.938-1.568.997-.455.051-.9-.136-2.891-.959-1.992-.823-3.275-2.854-3.374-2.988-.1-.133-.806-1.072-.806-2.046 0-.974.506-1.453.687-1.651.182-.198.396-.248.528-.248.132 0 .264.001.379.006.121.005.286-.046.446.338.162.384.557 1.357.606 1.456.048.099.08.214.015.343-.065.13-.098.225-.197.34-.099.115-.208.256-.296.346-.099.101-.202.211-.087.408.115.197.51 1.341 1.097 1.863.588.522 1.085.683 1.284.782.199.099.314.083.43-.05.117-.133.504-.585.638-.784.133-.199.268-.166.448-.099.179.066 1.138.536 1.336.635.198.1.33.15.379.233.049.084.049.484-.136 1.002z"/>
+                  </svg>
+                  Enviar
                 </button>
-                
                 <button 
-                  onClick={handleShare} 
-                  disabled={isProcessing} 
-                  className="w-full py-4.5 bg-gray-100 text-[#bd004d] font-black rounded-2xl active:scale-95 transition-all text-sm uppercase tracking-[0.25em] h-16 disabled:opacity-50"
+                  onClick={handleShare} disabled={isProcessing} 
+                  className="w-full py-4.5 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_15px_35px_rgba(189,0,77,0.35)] active:scale-95 transition-all text-sm uppercase tracking-[0.25em] h-16 flex items-center justify-center gap-3 disabled:opacity-50"
                 >
-                  Descargar Ticket
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                  Compartir
                 </button>
               </div>
             </div>
