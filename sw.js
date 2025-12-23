@@ -1,16 +1,15 @@
 
-const CACHE_NAME = 'yoshicash-v13';
+const CACHE_NAME = 'yoshicash-v14';
 const ASSETS = [
-  './',
-  'index.html',
-  'manifest.json'
+  '/',
+  '/index.html',
+  '/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      // Intentamos cachear todos los assets críticos
       return Promise.allSettled(
         ASSETS.map(asset => cache.add(asset))
       );
@@ -29,31 +28,34 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const networked = fetch(event.request)
-        .then((response) => {
-          // Si la respuesta es exitosa (200 OK), actualizamos la caché
-          if (response && response.status === 200) {
-            const cacheCopy = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, cacheCopy));
-          }
-          // Si es un error 404 en una navegación, devolvemos la caché si existe
-          if (response.status === 404 && event.request.mode === 'navigate') {
-            return cached || caches.match('./') || caches.match('index.html');
-          }
-          return response;
-        })
-        .catch(() => {
-          // En caso de fallo total de red (offline), servimos el fallback de navegación
-          if (event.request.mode === 'navigate') {
-            return cached || caches.match('./') || caches.match('index.html');
-          }
-          return cached;
-        });
 
-      return cached || networked;
-    })
+  // Estrategia: Network First, falling back to cache
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        // Si la red responde bien, cacheamos y devolvemos
+        if (response && response.status === 200) {
+          const cacheCopy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, cacheCopy));
+          return response;
+        }
+        
+        // Si el servidor devuelve 404 en una navegación, devolvemos el index de la caché
+        if (response.status === 404 && event.request.mode === 'navigate') {
+          return caches.match('/') || caches.match('/index.html');
+        }
+        
+        return response;
+      })
+      .catch(() => {
+        // Offline o fallo de red
+        return caches.match(event.request).then((cached) => {
+          if (cached) return cached;
+          
+          if (event.request.mode === 'navigate') {
+            return caches.match('/') || caches.match('/index.html');
+          }
+        });
+      })
   );
 });

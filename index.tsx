@@ -8,16 +8,16 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
-// Registro de Service Worker optimizado para evitar errores 404 post-instalación
+// Registro de Service Worker optimizado con scope absoluto
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // Usamos sw.js directamente para que se registre en la raíz del scope actual
-    navigator.serviceWorker.register('sw.js', { scope: './' })
+    // Registramos en la raíz para que controle todo el dominio dqr-yoshi.vercel.app
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
       .then(reg => {
-        console.log('✅ YoshiCash PWA: Service Worker listo.', reg.scope);
+        console.log('✅ PWA: Service Worker activo en scope:', reg.scope);
       })
       .catch(err => {
-        console.warn('⚠️ YoshiCash PWA: Error de registro:', err.message);
+        console.warn('⚠️ PWA: Error de registro:', err.message);
       });
   });
 }
