@@ -8,15 +8,16 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
-// Registro del Service Worker para PWA
+// Registro del Service Worker para PWA (Instalación nativa)
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
+    // Registramos sw.js directamente desde la raíz
+    navigator.serviceWorker.register('sw.js', { scope: './' })
       .then(registration => {
         console.log('SW registrado con éxito:', registration.scope);
       })
       .catch(error => {
-        console.log('Fallo en el registro de SW:', error);
+        console.error('Fallo en el registro de SW:', error);
       });
   });
 }
