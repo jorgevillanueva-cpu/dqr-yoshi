@@ -220,6 +220,11 @@ const App: React.FC = () => {
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-gray-50 pb-24 px-4 overflow-y-auto relative">
+      {/* Texto de versión en el top absoluto */}
+      <div className="text-center pt-6">
+        <span className="text-[10px] text-gray-400 font-medium tracking-tight">V 2.0 Developed JV®</span>
+      </div>
+
       {/* Banner de Instalación */}
       {showInstallBanner && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[150] w-[90%] max-w-sm animate-in slide-in-from-bottom-6 duration-500">
