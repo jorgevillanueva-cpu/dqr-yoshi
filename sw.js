@@ -1,17 +1,17 @@
 
-const CACHE_NAME = 'yoshicash-app-v10';
-const ASSETS_TO_CACHE = [
+const CACHE_NAME = 'yoshicash-v11';
+const ASSETS = [
+  './',
   'index.html',
-  'metadata.json'
+  'manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      // Intentamos cachear cada recurso por separado para que si uno falla no detenga todo
       return Promise.allSettled(
-        ASSETS_TO_CACHE.map(url => cache.add(url))
+        ASSETS.map(asset => cache.add(asset))
       );
     })
   );
@@ -30,18 +30,18 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) return cachedResponse;
-      
-      return fetch(event.request).then(response => {
-        // Retornar la respuesta de la red
-        return response;
-      }).catch(() => {
-        // En caso de estar offline, servir index.html para cualquier navegación
-        if (event.request.mode === 'navigate') {
-          return caches.match('index.html');
-        }
-      });
+    caches.match(event.request).then((cached) => {
+      const networked = fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const cacheCopy = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, cacheCopy));
+          }
+          return response;
+        })
+        .catch(() => cached);
+
+      return cached || networked;
     })
   );
 });
