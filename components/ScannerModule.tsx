@@ -20,8 +20,8 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
   const [ocrProgress, setOcrProgress] = useState(0);
   
   // Controles manuales de imagen optimizados para OCR
-  const [brightness, setBrightness] = useState(1.1);
-  const [contrast, setContrast] = useState(2.5);
+  const [brightness, setBrightness] = useState(1.0);
+  const [contrast, setContrast] = useState(2.0);
   const [showSettings, setShowSettings] = useState(false);
 
   const stopCamera = useCallback(() => {
@@ -98,6 +98,18 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
     }
   };
 
+  const applyThreshold = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    // Umbral adaptativo simple: si el promedio de color es menor a 128, se vuelve negro (0), si no blanco (255)
+    for (let i = 0; i < data.length; i += 4) {
+      const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      const val = avg < 120 ? 0 : 255;
+      data[i] = data[i + 1] = data[i + 2] = val;
+    }
+    ctx.putImageData(imageData, 0, 0);
+  };
+
   const processLocalOcr = async (canvas: HTMLCanvasElement): Promise<string> => {
     try {
       const worker = await createWorker('eng', 1, {
@@ -108,11 +120,13 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
         }
       });
       
-      // PSM 6: Trata la imagen como un bloque único de texto. Es más robusto que PSM 7 si el texto no es perfecto.
-      // Incluimos '_' porque a veces los guiones se confunden con guiones bajos en el OCR.
+      // Optimizaciones críticas de motor:
+      // PSM 7: Trata la imagen como una sola línea de texto (ideal para folios y UUIDs)
       await worker.setParameters({
-        tessedit_pageseg_mode: '6' as any,
-        tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_',
+        tessedit_pageseg_mode: '7' as any,
+        tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-',
+        tessjs_create_hocr: '0',
+        tessjs_create_tsv: '0',
       });
 
       const { data: { text } } = await worker.recognize(canvas);
@@ -137,53 +151,50 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (!ctx) return;
 
-      // Dimensiones del video
       const vWidth = video.videoWidth;
       const vHeight = video.videoHeight;
 
       // El cuadro visual es 92% ancho y 25% alto. 
-      // Capturamos un poco más de margen para evitar cortes accidentales
-      const cropW = vWidth * 0.94;
-      const cropH = vHeight * 0.30;
+      const cropW = vWidth * 0.92;
+      const cropH = vHeight * 0.25;
       const cropX = (vWidth - cropW) / 2;
       const cropY = (vHeight - cropH) / 2;
 
-      // Resolución alta para caracteres pequeños (UUIDs largos)
-      canvas.width = 2000;
-      canvas.height = (cropH / cropW) * 2000;
+      // Resolución ULTRA ALTA para máxima definición de bordes
+      canvas.width = 2400;
+      canvas.height = (cropH / cropW) * 2400;
 
-      // Pre-procesamiento de imagen dinámico
+      // Fase 1: Filtros de contexto (Mejora visual para el usuario si se viera)
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
-      ctx.filter = `contrast(${contrast}) grayscale(1) brightness(${brightness}) invert(0)`;
+      ctx.filter = `contrast(${contrast}) grayscale(1) brightness(${brightness})`;
       ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+      
+      // Fase 2: Binarización Manual (Clave para precisión Tesseract)
+      applyThreshold(ctx, canvas.width, canvas.height);
       
       const text = await processLocalOcr(canvas);
       
-      // LÓGICA DE NORMALIZACIÓN:
-      // 1. Convertimos guiones bajos a guiones (error común de OCR)
-      // 2. Eliminamos espacios innecesarios que rompen la cadena
-      const normalized = text.replace(/_/g, '-').replace(/\s+/g, '').trim();
+      // Limpieza profunda de ruido común en UUIDs
+      const normalized = text.toLowerCase().replace(/[^a-z0-9-]/g, '').trim();
       
-      // EXPRESIÓN REGULAR MEJORADA:
-      // Busca cualquier bloque alfanumérico con guiones de 8 a 64 caracteres.
-      const matches = normalized.match(/[a-z0-9-]{8,64}/gi) || [];
+      // Patrón específico para Yoshi Cash (ej: tick-...) o folios largos
+      const matches = normalized.match(/tick-[a-z0-9-]{10,64}|[a-z0-9-]{8,64}/gi) || [];
       const cleanMatches = Array.from(new Set(matches.map(m => m.toLowerCase())));
 
       if (cleanMatches.length > 0) {
         setResults(cleanMatches);
-        showPopMessage("Texto detectado", "success");
+        showPopMessage("Precisión alta: Código detectado", "success");
       } else {
-        // Fallback: si no hay patrón, pero hay texto alfanumérico largo
-        if (normalized.length > 5) {
-          setResults([normalized.toLowerCase()]);
-          showPopMessage("Cadena capturada", "success");
+        if (normalized.length > 6) {
+          setResults([normalized]);
+          showPopMessage("Lectura completada", "success");
         } else {
-          showPopMessage("No se detectó el código. Ajusta el enfoque.", "info");
+          showPopMessage("Informa: Intenta centrar más el código", "info");
         }
       }
     } catch (err) {
-      showPopMessage("Error al procesar imagen", "error");
+      showPopMessage("Error en el motor de visión", "error");
     } finally {
       setIsScanning(false);
       setOcrProgress(0);
@@ -201,34 +212,34 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           className={`w-full h-full object-cover transition-all duration-700 ${isScanning ? 'opacity-30 blur-md' : 'opacity-100'}`} 
         />
         
-        {/* Guía Visual Centrada */}
+        {/* Guía Visual con Animación de Escaneo */}
         <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
-          <div className="w-[92%] h-[25%] border-2 border-white/10 rounded-3xl relative shadow-[0_0_0_1000px_rgba(0,0,0,0.85)]">
-            <div className="absolute -top-1 -left-1 w-12 h-12 border-t-4 border-l-4 border-[#bd004d] rounded-tl-2xl"></div>
-            <div className="absolute -top-1 -right-1 w-12 h-12 border-t-4 border-r-4 border-[#bd004d] rounded-tr-2xl"></div>
-            <div className="absolute -bottom-1 -left-1 w-12 h-12 border-b-4 border-l-4 border-[#bd004d] rounded-bl-2xl"></div>
-            <div className="absolute -bottom-1 -right-1 w-12 h-12 border-b-4 border-r-4 border-[#bd004d] rounded-br-2xl"></div>
+          <div className="w-[92%] h-[25%] border-2 border-white/20 rounded-3xl relative shadow-[0_0_0_2000px_rgba(0,0,0,0.85)]">
+            <div className="absolute -top-1 -left-1 w-14 h-14 border-t-4 border-l-4 border-[#bd004d] rounded-tl-3xl"></div>
+            <div className="absolute -top-1 -right-1 w-14 h-14 border-t-4 border-r-4 border-[#bd004d] rounded-tr-3xl"></div>
+            <div className="absolute -bottom-1 -left-1 w-14 h-14 border-b-4 border-l-4 border-[#bd004d] rounded-bl-3xl"></div>
+            <div className="absolute -bottom-1 -right-1 w-14 h-14 border-b-4 border-r-4 border-[#bd004d] rounded-br-3xl"></div>
             
             {isScanning && (
-              <div className="absolute top-0 left-0 w-full h-1 bg-[#bd004d] shadow-[0_0_25px_#bd004d] animate-[scan_1.5s_infinite]"></div>
+              <div className="absolute top-0 left-0 w-full h-1 bg-[#bd004d] shadow-[0_0_35px_#bd004d] animate-[scan_1.2s_infinite]"></div>
             )}
           </div>
           
-          <div className="mt-10 text-center px-10">
-            <p className="text-white font-bold text-[10px] uppercase tracking-[0.5em] opacity-70">
-              {isScanning ? `EXTRAYENDO: ${ocrProgress}%` : 'POSICIONA EL CÓDIGO AQUÍ'}
+          <div className="mt-12 text-center px-10">
+            <p className="text-white font-black text-[11px] uppercase tracking-[0.6em] opacity-80 animate-pulse">
+              {isScanning ? `MODO PRECISIÓN: ${ocrProgress}%` : 'MANTÉN EL DISPOSITIVO FIRME'}
             </p>
           </div>
         </div>
 
-        {/* Botones de Control */}
+        {/* Controles Flotantes */}
         <div className="absolute top-12 left-0 w-full px-6 flex justify-between items-center pointer-events-auto">
           <div className="flex gap-3">
             {hasFlash && (
               <button 
                 onClick={toggleFlash}
-                className={`p-4 rounded-full backdrop-blur-xl border transition-all active:scale-90 ${
-                  isFlashOn ? 'bg-[#bd004d] text-white border-[#bd004d]/50 shadow-[0_0_30px_rgba(189,0,77,0.5)]' : 'bg-black/40 text-white border-white/10'
+                className={`p-4 rounded-full backdrop-blur-2xl border transition-all active:scale-90 ${
+                  isFlashOn ? 'bg-[#bd004d] text-white border-[#bd004d]/50 shadow-[0_0_40px_rgba(189,0,77,0.6)]' : 'bg-black/50 text-white border-white/10'
                 }`}
               >
                 <svg className="w-6 h-6" fill={isFlashOn ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
@@ -239,8 +250,8 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
             
             <button 
               onClick={() => setShowSettings(!showSettings)}
-              className={`p-4 rounded-full backdrop-blur-xl border transition-all active:scale-90 ${
-                showSettings ? 'bg-white text-black border-white' : 'bg-black/40 text-white border-white/10'
+              className={`p-4 rounded-full backdrop-blur-2xl border transition-all active:scale-90 ${
+                showSettings ? 'bg-white text-black border-white' : 'bg-black/50 text-white border-white/10'
               }`}
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -250,9 +261,8 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           </div>
           
           <button 
-            onClick={stopCamera}
-            onMouseUp={onClose}
-            className="p-4 bg-black/40 text-white rounded-full backdrop-blur-xl border border-white/10 active:scale-90"
+            onClick={() => { stopCamera(); onClose(); }}
+            className="p-4 bg-black/50 text-white rounded-full backdrop-blur-2xl border border-white/10 active:scale-90"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
@@ -260,51 +270,51 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           </button>
         </div>
 
-        {/* Panel de Ajustes */}
+        {/* Sliders de Ajuste Fino */}
         {showSettings && (
-          <div className="absolute top-32 left-6 right-6 p-6 bg-black/85 backdrop-blur-2xl rounded-[2.5rem] border border-white/10 space-y-6 animate-in slide-in-from-top-4 duration-300">
+          <div className="absolute top-32 left-6 right-6 p-8 bg-black/90 backdrop-blur-3xl rounded-[3rem] border border-white/10 space-y-8 animate-in slide-in-from-top-6 duration-300">
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-white text-[10px] font-black uppercase tracking-widest opacity-60">Exposición</span>
-                <span className="text-[#bd004d] font-mono text-xs">{brightness.toFixed(1)}</span>
+                <span className="text-white text-[11px] font-black uppercase tracking-widest opacity-40">Compensación Brillo</span>
+                <span className="text-[#bd004d] font-mono text-sm font-bold">{brightness.toFixed(1)}</span>
               </div>
               <input 
                 type="range" min="0.5" max="2.0" step="0.1" 
                 value={brightness} onChange={(e) => setBrightness(parseFloat(e.target.value))}
-                className="w-full accent-[#bd004d] h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                className="w-full accent-[#bd004d] h-2 bg-white/5 rounded-full appearance-none cursor-pointer"
               />
             </div>
             
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-white text-[10px] font-black uppercase tracking-widest opacity-60">Contraste</span>
-                <span className="text-[#bd004d] font-mono text-xs">{contrast.toFixed(1)}</span>
+                <span className="text-white text-[11px] font-black uppercase tracking-widest opacity-40">Factor Contraste</span>
+                <span className="text-[#bd004d] font-mono text-sm font-bold">{contrast.toFixed(1)}</span>
               </div>
               <input 
                 type="range" min="1.0" max="4.0" step="0.2" 
                 value={contrast} onChange={(e) => setContrast(parseFloat(e.target.value))}
-                className="w-full accent-[#bd004d] h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                className="w-full accent-[#bd004d] h-2 bg-white/5 rounded-full appearance-none cursor-pointer"
               />
             </div>
           </div>
         )}
       </div>
 
-      <div className="bg-[#0A0A0A] p-8 pb-14 rounded-t-[3.5rem] -mt-12 relative z-10 border-t border-white/10">
+      <div className="bg-[#0A0A0A] p-10 pb-16 rounded-t-[4rem] -mt-16 relative z-10 border-t border-white/10">
         {results.length > 0 ? (
-          <div className="space-y-6">
+          <div className="space-y-8 animate-in slide-in-from-bottom-6 duration-300">
             <div className="text-center">
-              <div className="w-12 h-1.5 bg-gray-800 rounded-full mx-auto mb-6"></div>
-              <p className="text-[#bd004d] text-[10px] font-black uppercase tracking-[0.3em] mb-1">Folio Detectado</p>
-              <p className="text-white/40 text-[10px]">Verifica y toca para seleccionar</p>
+              <div className="w-14 h-1.5 bg-gray-800 rounded-full mx-auto mb-8"></div>
+              <p className="text-[#bd004d] text-[11px] font-black uppercase tracking-[0.4em] mb-2">Lectura Exitosa</p>
+              <p className="text-white/30 text-[10px]">Confirma el código tocándolo</p>
             </div>
             
-            <div className="grid gap-3 max-h-52 overflow-y-auto custom-scrollbar px-1">
+            <div className="grid gap-4 max-h-60 overflow-y-auto custom-scrollbar px-2">
               {results.map((res, i) => (
                 <button
                   key={i}
                   onClick={() => onCodeSelected(res)}
-                  className="w-full py-5 px-5 bg-white/[0.03] border border-white/10 text-white font-mono text-sm break-all rounded-2xl active:bg-[#bd004d] transition-all flex items-center justify-center text-center shadow-lg"
+                  className="w-full py-6 px-6 bg-white/[0.04] border border-white/10 text-white font-mono text-base break-all rounded-[2rem] active:bg-[#bd004d] transition-all flex items-center justify-center text-center shadow-2xl"
                 >
                   {res}
                 </button>
@@ -313,38 +323,38 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
             
             <button 
               onClick={() => setResults([])}
-              className="w-full py-2 text-white/20 text-[9px] font-black uppercase tracking-[0.4em] hover:text-white transition-colors"
+              className="w-full py-3 text-white/20 text-[10px] font-black uppercase tracking-[0.5em] hover:text-white transition-colors"
             >
-              Reintentar Captura
+              Re-escanear Ticket
             </button>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-8">
-            <div className="w-12 h-1.5 bg-gray-800 rounded-full mb-2"></div>
+          <div className="flex flex-col items-center gap-10">
+            <div className="w-14 h-1.5 bg-gray-800 rounded-full mb-2"></div>
             
             <button 
               onClick={captureAndRead}
               disabled={isScanning}
-              className={`w-full h-20 rounded-3xl font-black text-[13px] uppercase tracking-[0.4em] transition-all flex items-center justify-center gap-5 ${
-                isScanning ? 'bg-gray-900 text-gray-700' : 'bg-[#bd004d] text-white shadow-[0_20px_50px_rgba(189,0,77,0.4)] active:scale-95'
+              className={`w-full h-24 rounded-[2.5rem] font-black text-sm uppercase tracking-[0.5em] transition-all flex items-center justify-center gap-6 ${
+                isScanning ? 'bg-gray-900 text-gray-700' : 'bg-[#bd004d] text-white shadow-[0_25px_60px_rgba(189,0,77,0.5)] active:scale-95'
               }`}
             >
               {isScanning ? (
                 <>
-                  <div className="w-6 h-6 border-3 border-white/10 border-t-white rounded-full animate-spin"></div>
-                  <span>PROCESANDO...</span>
+                  <div className="w-7 h-7 border-4 border-white/10 border-t-white rounded-full animate-spin"></div>
+                  <span>EXTRAYENDO...</span>
                 </>
               ) : (
                 <>
-                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812-1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                     <circle cx="12" cy="13" r="3" strokeWidth="2.5" />
                   </svg>
-                  <span>ESCANEAR CÓDIGO</span>
+                  <span>ESCANEAR AHORA</span>
                 </>
               )}
             </button>
-            <p className="text-white/10 text-[7px] font-bold tracking-[0.7em] uppercase">Lectura de Precisión Alfanumérica</p>
+            <p className="text-white/5 text-[8px] font-bold tracking-[0.8em] uppercase">Powered by High-Precision Local OCR 6.0</p>
           </div>
         )}
       </div>
@@ -354,22 +364,22 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
       <style>{`
         @keyframes scan {
           0% { top: 0%; opacity: 0; }
-          15% { opacity: 1; }
-          85% { opacity: 1; }
+          20% { opacity: 1; }
+          80% { opacity: 1; }
           100% { top: 100%; opacity: 0; }
         }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.05); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 10px; }
         input[type='range']::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 22px;
-          height: 22px;
+          width: 26px;
+          height: 26px;
           background: #bd004d;
-          border: 4px solid white;
+          border: 5px solid white;
           border-radius: 50%;
           cursor: pointer;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+          box-shadow: 0 8px 20px rgba(0,0,0,0.4);
         }
       `}</style>
     </div>
