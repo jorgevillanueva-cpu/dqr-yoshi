@@ -43,7 +43,6 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           videoRef.current.srcObject = mediaStream;
         }
 
-        // Detectar soporte de linterna
         const track = mediaStream.getVideoTracks()[0];
         if (track) {
           const capabilities = track.getCapabilities() as any;
@@ -52,7 +51,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           }
         }
       } catch (err) {
-        showPopMessage("Error al acceder a la cámara. Verifica los permisos del navegador.", "error");
+        showPopMessage("Error al acceder a la cámara. Verifica los permisos.", "error");
         onClose();
       }
     };
@@ -62,7 +61,6 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => {
-          // Asegurar apagar flash al cerrar
           if (track.kind === 'video' && (track as any).applyConstraints) {
              (track as any).applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
           }
@@ -83,12 +81,9 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
       });
       setIsFlashOn(newState);
     } catch (err) {
-      console.error("No se pudo controlar el flash:", err);
-      showPopMessage("El flash no está disponible en este momento", "info");
+      showPopMessage("No se pudo activar el flash", "info");
     }
   };
-
-  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   const performOcrWithRetry = async (base64Image: string, retries = 2): Promise<string> => {
     let lastError: any;
@@ -101,32 +96,22 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           contents: {
             parts: [
               { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
-              { text: "Analiza detalladamente este ticket de pago. Identifica y extrae EXCLUSIVAMENTE el Folio, Número de Ticket, Referencia o ID de Transacción. Ignora montos, fechas y nombres de comercios. Devuelve solo los códigos encontrados separados por comas. Si no ves nada, devuelve vacío." }
+              { text: "Lee este ticket. Busca el FOLIO, REFERENCIA, TICKET # o ID. Extrae solo los códigos alfanuméricos únicos. Devuelve los códigos encontrados separados por comas. Si el texto es borroso, intenta deducir los caracteres. No incluyas explicaciones." }
             ]
           },
           config: {
-            systemInstruction: "Eres un sistema OCR de alta precisión. Tu única tarea es extraer identificadores alfanuméricos únicos de tickets. No respondas con texto descriptivo, solo los códigos.",
-            temperature: 0.1,
+            systemInstruction: "Eres un experto en digitalización de tickets. Tu misión es encontrar códigos de identificación. Responde únicamente con los folios, sin texto adicional.",
+            temperature: 0, // Más determinista
           }
         });
         
         return response.text || "";
       } catch (err: any) {
         lastError = err;
-        const errMsg = err?.message || "";
-        const status = err?.status;
-        
-        if (status === 401 || status === 403 || errMsg.includes("Requested entity was not found") || errMsg.includes("API key not valid")) {
-          showPopMessage("Llave de API inválida o expirada", "info");
-          if (window.aistudio) {
-            await window.aistudio.openSelectKey();
-          }
+        if (err?.status === 401 || err?.status === 403) {
+          if (window.aistudio) await window.aistudio.openSelectKey();
         }
-
-        if (i < retries) {
-          await sleep(1000 * (i + 1));
-          continue;
-        }
+        if (i < retries) await new Promise(r => setTimeout(r, 1000 * (i + 1)));
       }
     }
     throw lastError;
@@ -135,55 +120,47 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
   const captureFrame = async () => {
     if (!videoRef.current || !canvasRef.current || isScanning) return;
 
-    if (window.aistudio) {
-      const hasKey = await window.aistudio.hasSelectedApiKey();
-      if (!hasKey) {
-        await window.aistudio.openSelectKey();
-      }
-    }
-
     const video = videoRef.current;
-    if (video.videoWidth === 0) {
-      showPopMessage("Iniciando cámara...", "info");
-      return;
-    }
+    if (video.videoWidth === 0) return;
 
     setIsScanning(true);
     
     try {
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (!context) return;
 
       const TARGET_WIDTH = 1024; 
       const scale = TARGET_WIDTH / video.videoWidth;
       canvas.width = TARGET_WIDTH;
       canvas.height = video.videoHeight * scale;
 
-      context?.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const base64Image = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+      // --- MEJORA DE IMAGEN (FILTRO DE CONTRASTE) ---
+      // Dibujamos con un filtro para ayudar al OCR en condiciones de baja luz
+      context.filter = 'contrast(1.4) brightness(1.1)';
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      const base64Image = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
       const responseText = await performOcrWithRetry(base64Image);
       
       if (!responseText.trim()) {
-        showPopMessage("No se detectó texto legible. Intenta con más luz.", "info");
+        showPopMessage("No se encontró texto claro. Limpia la lente o mejora la luz.", "info");
       } else {
-        const found = responseText.split(',')
-          .map(s => s.trim())
-          .filter(s => s.length >= 4 && !/error|sorry|unable|safety|bloqueo/i.test(s));
+        // Limpiamos la respuesta para extraer solo caracteres alfanuméricos que parezcan folios
+        const found = responseText.split(/[\s,]+/)
+          .map(s => s.replace(/[^a-zA-Z0-9-]/g, '').trim())
+          .filter(s => s.length >= 4 && !/error|sorry|unable|safety|blocked|folio|ticket|referencia/i.test(s));
         
         if (found.length > 0) {
           setResults(Array.from(new Set(found)));
-          showPopMessage("Lectura completada", "success");
+          showPopMessage("Digitalización exitosa", "success");
         } else {
-          showPopMessage("No se encontraron códigos válidos.", "info");
+          showPopMessage("No se detectaron folios válidos. Reintenta.", "info");
         }
       }
     } catch (err: any) {
-      const msg = err?.message || "";
-      if (err?.status === 429) showPopMessage("Límite de velocidad. Espera un momento.", "error");
-      else if (msg.includes("fetch")) showPopMessage("Sin conexión a internet.", "error");
-      else showPopMessage("Error de procesamiento. Mejora la luz.", "error");
-      console.error("OCR Debug:", err);
+      showPopMessage("Error de análisis. Acerca más el ticket.", "error");
     } finally {
       setIsScanning(false);
     }
@@ -213,27 +190,24 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
             
             <div className="absolute inset-0 flex items-center justify-center">
                <div className="bg-black/40 backdrop-blur-xl px-6 py-3 rounded-full border border-white/20 shadow-2xl">
-                  <p className="text-white text-[10px] font-black uppercase tracking-[0.4em]">ALINEA EL TICKET</p>
+                  <p className="text-white text-[10px] font-black uppercase tracking-[0.4em]">CAPTURA EL FOLIO</p>
                </div>
             </div>
           </div>
           
           <div className="mt-12 flex flex-col items-center gap-2">
             <p className="text-white/80 font-bold text-[11px] uppercase tracking-[0.2em] text-center px-10 leading-relaxed">
-              {isScanning ? 'PROCESANDO CON INTELIGENCIA ARTIFICIAL...' : 'COLOCA EL FOLIO DENTRO DEL RECUADRO'}
+              {isScanning ? 'LA IA ESTÁ LEYENDO TU TICKET...' : 'EVITA REFLEJOS Y MEJORA LA LUZ'}
             </p>
           </div>
         </div>
 
-        {/* Botones de Cabecera */}
         <div className="absolute top-12 left-0 w-full px-6 flex justify-between items-center">
           {hasFlash && (
             <button 
               onClick={toggleFlash}
               className={`p-4 rounded-full backdrop-blur-xl border transition-all active:scale-90 shadow-2xl ${
-                isFlashOn 
-                  ? 'bg-[#bd004d] text-white border-[#bd004d]/50' 
-                  : 'bg-black/60 text-white border-white/10'
+                isFlashOn ? 'bg-[#bd004d] text-white border-[#bd004d]/50' : 'bg-black/60 text-white border-white/10'
               }`}
             >
               <svg className="w-6 h-6" fill={isFlashOn ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
@@ -258,8 +232,8 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           <div className="space-y-6 animate-in slide-in-from-bottom-6 duration-500">
             <div className="text-center">
               <div className="w-12 h-1 bg-gray-800 rounded-full mx-auto mb-6"></div>
-              <p className="text-[#bd004d] text-[11px] font-black uppercase tracking-[0.2em] mb-1">Folios Encontrados</p>
-              <p className="text-white/40 text-[11px] font-medium">Toca el folio para digitalizarlo</p>
+              <p className="text-[#bd004d] text-[11px] font-black uppercase tracking-[0.2em] mb-1">Folios Detectados</p>
+              <p className="text-white/40 text-[11px] font-medium">Confirma el folio de tu ticket</p>
             </div>
             
             <div className="flex flex-col gap-3 max-h-64 overflow-y-auto custom-scrollbar pr-1">
@@ -267,7 +241,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
                 <button
                   key={i}
                   onClick={() => onCodeSelected(res)}
-                  className="w-full px-6 py-5 bg-white/[0.04] border border-white/10 text-white font-mono text-xl uppercase text-center rounded-2xl active:bg-[#bd004d] active:border-[#bd004d] active:scale-[0.98] transition-all hover:bg-white/[0.08]"
+                  className="w-full px-6 py-5 bg-white/[0.04] border border-white/10 text-white font-mono text-xl uppercase text-center rounded-2xl active:bg-[#bd004d] active:border-[#bd004d] active:scale-[0.98] transition-all"
                 >
                   {res}
                 </button>
@@ -276,12 +250,9 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
             
             <button 
               onClick={() => { setResults([]); setIsScanning(false); }}
-              className="w-full py-4 text-white/40 text-[10px] font-black uppercase tracking-[0.3em] flex items-center justify-center gap-2 hover:text-white transition-colors"
+              className="w-full py-4 text-white/40 text-[10px] font-black uppercase tracking-[0.3em] flex items-center justify-center gap-2 hover:text-white"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Re-escanear ticket
+              Intentar de nuevo
             </button>
           </div>
         ) : (
@@ -292,9 +263,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
               onClick={captureFrame}
               disabled={isScanning}
               className={`w-full h-20 rounded-3xl font-black text-[14px] uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-5 shadow-2xl ${
-                isScanning 
-                  ? 'bg-gray-900 text-gray-700 cursor-not-allowed' 
-                  : 'bg-[#bd004d] text-white shadow-[0_20px_45px_rgba(189,0,77,0.45)] active:scale-95 hover:bg-[#d40058]'
+                isScanning ? 'bg-gray-900 text-gray-700 cursor-wait' : 'bg-[#bd004d] text-white shadow-[0_20px_45px_rgba(189,0,77,0.45)] active:scale-95'
               }`}
             >
               {isScanning ? (
@@ -306,16 +275,12 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
                 <>
                   <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812-1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                   <span>ESCANEAR TICKET</span>
                 </>
               )}
             </button>
-            
-            <div className="flex flex-col items-center gap-1.5 opacity-30">
-              <span className="text-white text-[9px] font-black tracking-[0.5em] uppercase">Gemini Vision AI Engine</span>
-            </div>
+            <span className="text-white/20 text-[8px] font-bold tracking-[0.5em] uppercase">Powered by AI Vision v2.5</span>
           </div>
         )}
       </div>
