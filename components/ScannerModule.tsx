@@ -41,6 +41,12 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           tessedit_pageseg_mode: '6' as any,
           tessedit_char_whitelist: '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-,$ ',
           tessedit_ocr_engine_mode: '1' as any,
+          tessedit_do_invert: '0',
+          tessjs_create_hocr: '0',
+          tessjs_create_tsv: '0',
+          tessjs_create_box: '0',
+          tessjs_create_unlv: '0',
+          tessjs_create_osd: '0'
         });
 
         if (active) {
@@ -131,44 +137,12 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
     }
   };
 
-  const sharpen = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    const weights = [0, -1, 0, -1, 5, -1, 0, -1, 0];
-    const src = ctx.getImageData(0, 0, w, h);
-    const sw = src.width;
-    const sh = src.height;
-    const s = src.data;
-    const output = ctx.createImageData(w, h);
-    const dst = output.data;
-
-    for (let y = 0; y < sh; y++) {
-      for (let x = 0; x < sw; x++) {
-        const dstOff = (y * sw + x) * 4;
-        let r = 0, g = 0, b = 0;
-        for (let cy = 0; cy < 3; cy++) {
-          for (let cx = 0; cx < 3; cx++) {
-            const scy = y + cy - 1;
-            const scx = x + cx - 1;
-            if (scy >= 0 && scy < sh && scx >= 0 && scx < sw) {
-              const srcOff = (scy * sw + scx) * 4;
-              const wt = weights[cy * 3 + cx];
-              r += s[srcOff] * wt;
-              g += s[srcOff + 1] * wt;
-              b += s[srcOff + 2] * wt;
-            }
-          }
-        }
-        dst[dstOff] = r; dst[dstOff + 1] = g; dst[dstOff + 2] = b; dst[dstOff + 3] = s[dstOff + 3];
-      }
-    }
-    ctx.putImageData(output, 0, 0);
-  };
-
-  const applyThreshold = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+  const applyFastThreshold = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     const imageData = ctx.getImageData(0, 0, width, height);
     const data = imageData.data;
     for (let i = 0; i < data.length; i += 4) {
-      const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-      const val = avg < 128 ? 0 : 255;
+      const brightness = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      const val = brightness < 128 ? 0 : 255;
       data[i] = data[i + 1] = data[i + 2] = val;
     }
     ctx.putImageData(imageData, 0, 0);
@@ -194,16 +168,15 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
       const cropX = (vWidth - cropW) / 2;
       const cropY = (vHeight - cropH) / 2;
 
-      canvas.width = 2400;
-      canvas.height = (cropH / cropW) * 2400;
+      canvas.width = 1600;
+      canvas.height = (cropH / cropW) * 1600;
 
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
-      ctx.filter = `contrast(${contrast}) grayscale(1) brightness(${brightness})`;
+      ctx.filter = `contrast(${contrast}) grayscale(1) brightness(${brightness}) blur(0.1px)`;
       ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
       
-      sharpen(ctx, canvas.width, canvas.height);
-      applyThreshold(ctx, canvas.width, canvas.height);
+      applyFastThreshold(ctx, canvas.width, canvas.height);
       
       if (!workerRef.current) throw new Error("WORKER_NOT_INIT");
       
@@ -229,15 +202,10 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
         });
       };
 
-      // 1. Buscar en líneas individuales
       rawLines.forEach(line => findPatterns(line));
-
-      // 2. Buscar uniendo cada 2 renglones (para códigos divididos)
       for (let i = 0; i < rawLines.length - 1; i++) {
         findPatterns(rawLines[i] + rawLines[i+1]);
       }
-
-      // 3. Buscar en todo el texto unido (en caso de múltiples saltos)
       findPatterns(rawLines.join(''));
 
       const uniqueResults = Array.from(new Set(foundItems))
@@ -254,9 +222,9 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
 
       if (sortedResults.length > 0) {
         setResults(sortedResults);
-        showPopMessage("Lectura optimizada", "success");
+        showPopMessage("Lectura completada", "success");
       } else {
-        showPopMessage("Intenta ajustar el enfoque o la luz", "info");
+        showPopMessage("Intenta ajustar el enfoque", "info");
       }
     } catch (err) {
       showPopMessage("Error en procesamiento", "error");
@@ -280,7 +248,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           </div>
           <div className="mt-12 text-center px-10">
             <p className="text-white font-black text-[11px] uppercase tracking-[0.6em] opacity-80 animate-pulse">
-              {!isWorkerReady ? 'INICIALIZANDO...' : isScanning ? `UNIDIRECCIONAL: ${ocrProgress}%` : 'MODO FUSIÓN DE RENGONES'}
+              {!isWorkerReady ? 'INICIALIZANDO...' : isScanning ? `ANALIZANDO: ${ocrProgress}%` : 'ANALIZANDO'}
             </p>
           </div>
         </div>
@@ -313,7 +281,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
       <div className="bg-[#0A0A0A] p-10 pb-16 rounded-t-[4rem] -mt-16 relative z-10 border-t border-white/10">
         {results.length > 0 ? (
           <div className="space-y-8 animate-in slide-in-from-bottom-6 duration-300">
-            <div className="text-center"><div className="w-14 h-1.5 bg-gray-800 rounded-full mx-auto mb-8"></div><p className="text-[#bd004d] text-[11px] font-black uppercase tracking-[0.4em] mb-2">Resultados Fusionados</p></div>
+            <div className="text-center"><div className="w-14 h-1.5 bg-gray-800 rounded-full mx-auto mb-8"></div><p className="text-[#bd004d] text-[11px] font-black uppercase tracking-[0.4em] mb-2">Resultados</p></div>
             <div className="grid gap-4 max-h-64 overflow-y-auto custom-scrollbar px-2">
               {results.map((res, i) => (
                 <button key={i} onClick={() => onCodeSelected(res)} className={`w-full py-6 px-6 border font-mono text-base break-all rounded-[2rem] active:bg-[#bd004d] transition-all flex items-center justify-center text-center shadow-2xl ${res.toLowerCase().includes('tick-') ? 'bg-[#bd004d]/20 border-[#bd004d]/50 text-white' : 'bg-white/[0.04] border-white/10 text-white'}`}>{res}</button>
@@ -327,7 +295,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
             <button onClick={captureAndRead} disabled={isScanning || !isWorkerReady} className={`w-full h-24 rounded-[2.5rem] font-black text-sm uppercase tracking-[0.5em] transition-all flex items-center justify-center gap-6 ${(isScanning || !isWorkerReady) ? 'bg-gray-900 text-gray-700' : 'bg-[#bd004d] text-white shadow-[0_25px_60px_rgba(189,0,77,0.5)] active:scale-95'}`}>
               {isScanning ? <><div className="w-7 h-7 border-4 border-white/10 border-t-white rounded-full animate-spin"></div><span>ANALIZANDO...</span></> : !isWorkerReady ? <span>CARGANDO...</span> : <><svg className="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812-1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" strokeWidth="2.5" /></svg><span>ESCANEAR TICKET</span></>}
             </button>
-            <p className="text-white/5 text-[8px] font-bold tracking-[0.8em] uppercase">Multi-Row Smart Scan v14.0</p>
+            <p className="text-white/5 text-[8px] font-bold tracking-[0.8em] uppercase">HyperSpeed Scan v15.0</p>
           </div>
         )}
       </div>
