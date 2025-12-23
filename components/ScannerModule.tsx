@@ -14,7 +14,7 @@ declare global {
     openSelectKey: () => Promise<void>;
   }
   interface Window {
-    aistudio: AIStudio;
+    aistudio?: AIStudio;
   }
 }
 
@@ -24,6 +24,8 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
   const streamRef = useRef<MediaStream | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [results, setResults] = useState<string[]>([]);
+  const [hasFlash, setHasFlash] = useState(false);
+  const [isFlashOn, setIsFlashOn] = useState(false);
 
   useEffect(() => {
     const initCamera = async () => {
@@ -35,9 +37,19 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
             height: { ideal: 1080 }
           }
         });
+        
         streamRef.current = mediaStream;
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream;
+        }
+
+        // Detectar soporte de linterna
+        const track = mediaStream.getVideoTracks()[0];
+        if (track) {
+          const capabilities = track.getCapabilities() as any;
+          if (capabilities.torch) {
+            setHasFlash(true);
+          }
         }
       } catch (err) {
         showPopMessage("Error al acceder a la cámara. Verifica los permisos del navegador.", "error");
@@ -49,11 +61,32 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
 
     return () => {
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current.getTracks().forEach(track => {
+          // Asegurar apagar flash al cerrar
+          if (track.kind === 'video' && (track as any).applyConstraints) {
+             (track as any).applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+          }
+          track.stop();
+        });
         streamRef.current = null;
       }
     };
   }, [onClose, showPopMessage]);
+
+  const toggleFlash = async () => {
+    if (!streamRef.current || !hasFlash) return;
+    const track = streamRef.current.getVideoTracks()[0];
+    try {
+      const newState = !isFlashOn;
+      await (track as any).applyConstraints({
+        advanced: [{ torch: newState }]
+      });
+      setIsFlashOn(newState);
+    } catch (err) {
+      console.error("No se pudo controlar el flash:", err);
+      showPopMessage("El flash no está disponible en este momento", "info");
+    }
+  };
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -83,7 +116,6 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
         const errMsg = err?.message || "";
         const status = err?.status;
         
-        // Manejo extendido de errores de autenticación o llave inválida
         if (status === 401 || status === 403 || errMsg.includes("Requested entity was not found") || errMsg.includes("API key not valid")) {
           showPopMessage("Llave de API inválida o expirada", "info");
           if (window.aistudio) {
@@ -122,15 +154,12 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d', { willReadFrequently: true });
 
-      // Resolución aumentada para mejor legibilidad de fuentes pequeñas
       const TARGET_WIDTH = 1024; 
       const scale = TARGET_WIDTH / video.videoWidth;
       canvas.width = TARGET_WIDTH;
       canvas.height = video.videoHeight * scale;
 
       context?.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      // Calidad aumentada para reducir artefactos de compresión en bordes de texto
       const base64Image = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
 
       const responseText = await performOcrWithRetry(base64Image);
@@ -150,18 +179,10 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
         }
       }
     } catch (err: any) {
-      const status = err?.status;
       const msg = err?.message || "";
-      
-      if (status === 429) {
-        showPopMessage("Límite de velocidad. Espera un momento.", "error");
-      } else if (msg.includes("fetch") || msg.includes("network")) {
-        showPopMessage("Sin conexión a internet.", "error");
-      } else if (msg.includes("safety") || msg.includes("blocked")) {
-        showPopMessage("Imagen bloqueada por seguridad. Reintenta.", "error");
-      } else {
-        showPopMessage("Error de procesamiento. Mejora la luz.", "error");
-      }
+      if (err?.status === 429) showPopMessage("Límite de velocidad. Espera un momento.", "error");
+      else if (msg.includes("fetch")) showPopMessage("Sin conexión a internet.", "error");
+      else showPopMessage("Error de procesamiento. Mejora la luz.", "error");
       console.error("OCR Debug:", err);
     } finally {
       setIsScanning(false);
@@ -201,18 +222,35 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
             <p className="text-white/80 font-bold text-[11px] uppercase tracking-[0.2em] text-center px-10 leading-relaxed">
               {isScanning ? 'PROCESANDO CON INTELIGENCIA ARTIFICIAL...' : 'COLOCA EL FOLIO DENTRO DEL RECUADRO'}
             </p>
-            {!isScanning && <p className="text-[#bd004d] text-[9px] font-black uppercase tracking-widest animate-pulse">Mejora la iluminación para mejores resultados</p>}
           </div>
         </div>
 
-        <button 
-          onClick={onClose}
-          className="absolute top-12 right-6 p-4 bg-black/60 text-white rounded-full backdrop-blur-xl border border-white/10 active:scale-90 transition-transform shadow-2xl"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        {/* Botones de Cabecera */}
+        <div className="absolute top-12 left-0 w-full px-6 flex justify-between items-center">
+          {hasFlash && (
+            <button 
+              onClick={toggleFlash}
+              className={`p-4 rounded-full backdrop-blur-xl border transition-all active:scale-90 shadow-2xl ${
+                isFlashOn 
+                  ? 'bg-[#bd004d] text-white border-[#bd004d]/50' 
+                  : 'bg-black/60 text-white border-white/10'
+              }`}
+            >
+              <svg className="w-6 h-6" fill={isFlashOn ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </button>
+          )}
+          
+          <button 
+            onClick={onClose}
+            className="ml-auto p-4 bg-black/60 text-white rounded-full backdrop-blur-xl border border-white/10 active:scale-90 transition-transform shadow-2xl"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div className="bg-[#0A0A0A] p-8 pb-14 rounded-t-[3.5rem] -mt-16 relative z-10 border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
