@@ -33,14 +33,16 @@ const App: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     let processedValue = value;
-    if (name === 'codigo') processedValue = value.toLowerCase();
-    else if (name === 'saldo') {
+    
+    if (name === 'saldo') {
       const clean = value.replace(/[^\d.]/g, '');
       const parts = clean.split('.');
       if (parts.length > 2) return;
       parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
       processedValue = parts.join('.');
     }
+    // Ya no forzamos .toLowerCase() en 'codigo'
+    
     setFormData(prev => ({ ...prev, [name]: processedValue }));
   };
 
@@ -188,7 +190,8 @@ const App: React.FC = () => {
           showPopMessage={showPopMessage}
           onCodeSelected={(code) => {
             if (scannerTarget === 'codigo') {
-              setFormData(prev => ({ ...prev, codigo: code.toLowerCase() }));
+              // Ya no forzamos .toLowerCase() al recibir del scanner
+              setFormData(prev => ({ ...prev, codigo: code }));
             } else {
               const cleanValue = code.replace(/[^\d.]/g, '');
               setFormData(prev => ({ ...prev, saldo: cleanValue }));
@@ -230,7 +233,7 @@ const App: React.FC = () => {
               <div className="relative flex items-center">
                 <input 
                   type="text" name="codigo" value={formData.codigo} onChange={handleInputChange} 
-                  className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none lowercase focus:ring-2 focus:ring-[#bd004d]/10 font-bold text-gray-700 transition-all pr-14 placeholder:font-normal" 
+                  className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[#bd004d]/10 font-bold text-gray-700 transition-all pr-14 placeholder:font-normal" 
                   placeholder="Número de ticket" 
                 />
                 <button 
