@@ -19,9 +19,9 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
   const [isFlashOn, setIsFlashOn] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   
-  // Controles manuales de imagen
-  const [brightness, setBrightness] = useState(1.1); // Default 1.1
-  const [contrast, setContrast] = useState(2.8);    // Default 2.8
+  // Controles manuales de imagen optimizados para OCR
+  const [brightness, setBrightness] = useState(1.1);
+  const [contrast, setContrast] = useState(2.5);
   const [showSettings, setShowSettings] = useState(false);
 
   const stopCamera = useCallback(() => {
@@ -94,13 +94,8 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
       });
       setIsFlashOn(newState);
     } catch (err) {
-      showPopMessage("No se pudo activar el flash", "info");
+      showPopMessage("Error con el flash", "info");
     }
-  };
-
-  const handleClose = () => {
-    stopCamera();
-    onClose();
   };
 
   const processLocalOcr = async (canvas: HTMLCanvasElement): Promise<string> => {
@@ -113,9 +108,11 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
         }
       });
       
+      // PSM 6: Trata la imagen como un bloque único de texto. Es más robusto que PSM 7 si el texto no es perfecto.
+      // Incluimos '_' porque a veces los guiones se confunden con guiones bajos en el OCR.
       await worker.setParameters({
-        tessedit_pageseg_mode: '7' as any, // Single line mode
-        tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-', 
+        tessedit_pageseg_mode: '6' as any,
+        tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_',
       });
 
       const { data: { text } } = await worker.recognize(canvas);
@@ -132,6 +129,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
 
     setIsScanning(true);
     setOcrProgress(0);
+    setResults([]);
     
     try {
       const video = videoRef.current;
@@ -139,42 +137,53 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (!ctx) return;
 
+      // Dimensiones del video
       const vWidth = video.videoWidth;
       const vHeight = video.videoHeight;
 
-      // "Wider scanning range": Aumentamos el ancho al 92% y alto al 25% para códigos largos
-      const cropW = vWidth * 0.92;
-      const cropH = vHeight * 0.25;
+      // El cuadro visual es 92% ancho y 25% alto. 
+      // Capturamos un poco más de margen para evitar cortes accidentales
+      const cropW = vWidth * 0.94;
+      const cropH = vHeight * 0.30;
       const cropX = (vWidth - cropW) / 2;
       const cropY = (vHeight - cropH) / 2;
 
-      canvas.width = 1800; // Mayor resolución horizontal para UUIDs largos
-      canvas.height = (cropH / cropW) * 1800;
+      // Resolución alta para caracteres pequeños (UUIDs largos)
+      canvas.width = 2000;
+      canvas.height = (cropH / cropW) * 2000;
 
-      // Filtros dinámicos basados en controles manuales
-      ctx.filter = `contrast(${contrast}) grayscale(1) brightness(${brightness}) sharp(5px)`;
+      // Pre-procesamiento de imagen dinámico
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.filter = `contrast(${contrast}) grayscale(1) brightness(${brightness}) invert(0)`;
       ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
       
       const text = await processLocalOcr(canvas);
-      const cleanRaw = text.replace(/\s+/g, '').trim();
       
-      const regex = /tick-[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}|[a-z0-9-]{10,64}/gi;
-      const matches = cleanRaw.match(regex) || [];
+      // LÓGICA DE NORMALIZACIÓN:
+      // 1. Convertimos guiones bajos a guiones (error común de OCR)
+      // 2. Eliminamos espacios innecesarios que rompen la cadena
+      const normalized = text.replace(/_/g, '-').replace(/\s+/g, '').trim();
+      
+      // EXPRESIÓN REGULAR MEJORADA:
+      // Busca cualquier bloque alfanumérico con guiones de 8 a 64 caracteres.
+      const matches = normalized.match(/[a-z0-9-]{8,64}/gi) || [];
       const cleanMatches = Array.from(new Set(matches.map(m => m.toLowerCase())));
 
       if (cleanMatches.length > 0) {
         setResults(cleanMatches);
-        showPopMessage("Código detectado", "success");
+        showPopMessage("Texto detectado", "success");
       } else {
-        if (cleanRaw.length >= 8) {
-           setResults([cleanRaw.toLowerCase()]);
-           showPopMessage("Cadena extraída", "success");
+        // Fallback: si no hay patrón, pero hay texto alfanumérico largo
+        if (normalized.length > 5) {
+          setResults([normalized.toLowerCase()]);
+          showPopMessage("Cadena capturada", "success");
         } else {
-           showPopMessage("Ajusta el brillo/contraste si no se lee", "info");
+          showPopMessage("No se detectó el código. Ajusta el enfoque.", "info");
         }
       }
     } catch (err) {
-      showPopMessage("Error de lectura local", "error");
+      showPopMessage("Error al procesar imagen", "error");
     } finally {
       setIsScanning(false);
       setOcrProgress(0);
@@ -192,9 +201,9 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           className={`w-full h-full object-cover transition-all duration-700 ${isScanning ? 'opacity-30 blur-md' : 'opacity-100'}`} 
         />
         
-        {/* Guía Visual Ampliada */}
+        {/* Guía Visual Centrada */}
         <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
-          <div className="w-[92%] h-[25%] border-2 border-white/10 rounded-3xl relative shadow-[0_0_0_1000px_rgba(0,0,0,0.8)]">
+          <div className="w-[92%] h-[25%] border-2 border-white/10 rounded-3xl relative shadow-[0_0_0_1000px_rgba(0,0,0,0.85)]">
             <div className="absolute -top-1 -left-1 w-12 h-12 border-t-4 border-l-4 border-[#bd004d] rounded-tl-2xl"></div>
             <div className="absolute -top-1 -right-1 w-12 h-12 border-t-4 border-r-4 border-[#bd004d] rounded-tr-2xl"></div>
             <div className="absolute -bottom-1 -left-1 w-12 h-12 border-b-4 border-l-4 border-[#bd004d] rounded-bl-2xl"></div>
@@ -205,14 +214,14 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
             )}
           </div>
           
-          <div className="mt-8 text-center px-10">
-            <p className="text-white font-bold text-[9px] uppercase tracking-[0.5em] opacity-60">
-              {isScanning ? `ANALIZANDO: ${ocrProgress}%` : 'UBICA EL CÓDIGO EN EL RECUADRO'}
+          <div className="mt-10 text-center px-10">
+            <p className="text-white font-bold text-[10px] uppercase tracking-[0.5em] opacity-70">
+              {isScanning ? `EXTRAYENDO: ${ocrProgress}%` : 'POSICIONA EL CÓDIGO AQUÍ'}
             </p>
           </div>
         </div>
 
-        {/* Controles Superiores */}
+        {/* Botones de Control */}
         <div className="absolute top-12 left-0 w-full px-6 flex justify-between items-center pointer-events-auto">
           <div className="flex gap-3">
             {hasFlash && (
@@ -241,7 +250,8 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           </div>
           
           <button 
-            onClick={handleClose}
+            onClick={stopCamera}
+            onMouseUp={onClose}
             className="p-4 bg-black/40 text-white rounded-full backdrop-blur-xl border border-white/10 active:scale-90"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -250,16 +260,16 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           </button>
         </div>
 
-        {/* Panel de Ajustes Manuales */}
+        {/* Panel de Ajustes */}
         {showSettings && (
-          <div className="absolute top-32 left-6 right-6 p-6 bg-black/80 backdrop-blur-2xl rounded-[2rem] border border-white/10 space-y-6 animate-in slide-in-from-top-4 duration-300">
+          <div className="absolute top-32 left-6 right-6 p-6 bg-black/85 backdrop-blur-2xl rounded-[2.5rem] border border-white/10 space-y-6 animate-in slide-in-from-top-4 duration-300">
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-white text-[10px] font-black uppercase tracking-widest">Brillo</span>
-                <span className="text-[#bd004d] font-mono text-xs">{brightness.toFixed(1)}x</span>
+                <span className="text-white text-[10px] font-black uppercase tracking-widest opacity-60">Exposición</span>
+                <span className="text-[#bd004d] font-mono text-xs">{brightness.toFixed(1)}</span>
               </div>
               <input 
-                type="range" min="0.5" max="2.5" step="0.1" 
+                type="range" min="0.5" max="2.0" step="0.1" 
                 value={brightness} onChange={(e) => setBrightness(parseFloat(e.target.value))}
                 className="w-full accent-[#bd004d] h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer"
               />
@@ -267,33 +277,26 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
             
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-white text-[10px] font-black uppercase tracking-widest">Contraste</span>
-                <span className="text-[#bd004d] font-mono text-xs">{contrast.toFixed(1)}x</span>
+                <span className="text-white text-[10px] font-black uppercase tracking-widest opacity-60">Contraste</span>
+                <span className="text-[#bd004d] font-mono text-xs">{contrast.toFixed(1)}</span>
               </div>
               <input 
-                type="range" min="1.0" max="5.0" step="0.2" 
+                type="range" min="1.0" max="4.0" step="0.2" 
                 value={contrast} onChange={(e) => setContrast(parseFloat(e.target.value))}
                 className="w-full accent-[#bd004d] h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer"
               />
             </div>
-
-            <button 
-              onClick={() => { setBrightness(1.1); setContrast(2.8); }}
-              className="w-full py-2 text-white/40 text-[9px] font-black uppercase tracking-widest border border-white/5 rounded-xl"
-            >
-              Restablecer Valores
-            </button>
           </div>
         )}
       </div>
 
-      <div className="bg-[#0A0A0A] p-8 pb-14 rounded-t-[3.5rem] -mt-12 relative z-10 border-t border-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.8)]">
+      <div className="bg-[#0A0A0A] p-8 pb-14 rounded-t-[3.5rem] -mt-12 relative z-10 border-t border-white/10">
         {results.length > 0 ? (
           <div className="space-y-6">
             <div className="text-center">
               <div className="w-12 h-1.5 bg-gray-800 rounded-full mx-auto mb-6"></div>
-              <p className="text-[#bd004d] text-[10px] font-black uppercase tracking-[0.3em] mb-1">Resultado de Escaneo</p>
-              <p className="text-white/40 text-[10px]">Toca para seleccionar el código correcto</p>
+              <p className="text-[#bd004d] text-[10px] font-black uppercase tracking-[0.3em] mb-1">Folio Detectado</p>
+              <p className="text-white/40 text-[10px]">Verifica y toca para seleccionar</p>
             </div>
             
             <div className="grid gap-3 max-h-52 overflow-y-auto custom-scrollbar px-1">
@@ -301,7 +304,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
                 <button
                   key={i}
                   onClick={() => onCodeSelected(res)}
-                  className="w-full py-5 px-4 bg-white/[0.03] border border-white/10 text-white font-mono text-sm break-all rounded-2xl active:bg-[#bd004d] transition-all flex items-center justify-center text-center"
+                  className="w-full py-5 px-5 bg-white/[0.03] border border-white/10 text-white font-mono text-sm break-all rounded-2xl active:bg-[#bd004d] transition-all flex items-center justify-center text-center shadow-lg"
                 >
                   {res}
                 </button>
@@ -309,10 +312,10 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
             </div>
             
             <button 
-              onClick={() => { setResults([]); setIsScanning(false); }}
-              className="w-full py-2 text-white/20 text-[9px] font-black uppercase tracking-[0.4em]"
+              onClick={() => setResults([])}
+              className="w-full py-2 text-white/20 text-[9px] font-black uppercase tracking-[0.4em] hover:text-white transition-colors"
             >
-              Nueva Captura
+              Reintentar Captura
             </button>
           </div>
         ) : (
@@ -341,7 +344,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
                 </>
               )}
             </button>
-            <p className="text-white/10 text-[7px] font-bold tracking-[0.7em] uppercase">Control Manual de Imagen Activado</p>
+            <p className="text-white/10 text-[7px] font-bold tracking-[0.7em] uppercase">Lectura de Precisión Alfanumérica</p>
           </div>
         )}
       </div>
@@ -360,12 +363,13 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
         input[type='range']::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 20px;
-          height: 20px;
+          width: 22px;
+          height: 22px;
           background: #bd004d;
-          border: 3px solid white;
+          border: 4px solid white;
           border-radius: 50%;
           cursor: pointer;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
       `}</style>
     </div>
