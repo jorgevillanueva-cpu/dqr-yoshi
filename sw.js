@@ -1,19 +1,17 @@
 
-const CACHE_NAME = 'yoshicash-app-v8';
+const CACHE_NAME = 'yoshicash-app-v10';
 const ASSETS_TO_CACHE = [
-  './',
   'index.html',
-  'manifest.json'
+  'metadata.json'
 ];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return Promise.all(
-        ASSETS_TO_CACHE.map(url => {
-          return cache.add(url).catch(err => console.warn(`Fallo al cachear ${url}:`, err));
-        })
+      // Intentamos cachear cada recurso por separado para que si uno falla no detenga todo
+      return Promise.allSettled(
+        ASSETS_TO_CACHE.map(url => cache.add(url))
       );
     })
   );
@@ -36,10 +34,12 @@ self.addEventListener('fetch', (event) => {
       if (cachedResponse) return cachedResponse;
       
       return fetch(event.request).then(response => {
+        // Retornar la respuesta de la red
         return response;
       }).catch(() => {
+        // En caso de estar offline, servir index.html para cualquier navegación
         if (event.request.mode === 'navigate') {
-          return caches.match('./') || caches.match('index.html');
+          return caches.match('index.html');
         }
       });
     })
