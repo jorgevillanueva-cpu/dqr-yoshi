@@ -19,7 +19,6 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
   const [isFlashOn, setIsFlashOn] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   
-  // Controles manuales de imagen optimizados para OCR
   const [brightness, setBrightness] = useState(1.0);
   const [contrast, setContrast] = useState(2.0);
   const [showSettings, setShowSettings] = useState(false);
@@ -101,10 +100,9 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
   const applyThreshold = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     const imageData = ctx.getImageData(0, 0, width, height);
     const data = imageData.data;
-    // Umbral adaptativo simple: si el promedio de color es menor a 128, se vuelve negro (0), si no blanco (255)
     for (let i = 0; i < data.length; i += 4) {
       const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-      const val = avg < 120 ? 0 : 255;
+      const val = avg < 125 ? 0 : 255;
       data[i] = data[i + 1] = data[i + 2] = val;
     }
     ctx.putImageData(imageData, 0, 0);
@@ -120,13 +118,10 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
         }
       });
       
-      // Optimizaciones críticas de motor:
-      // PSM 7: Trata la imagen como una sola línea de texto (ideal para folios y UUIDs)
+      // Modo bloque (PSM 6) para leer múltiples líneas y capturar todo el texto visible
       await worker.setParameters({
-        tessedit_pageseg_mode: '7' as any,
-        tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-',
-        tessjs_create_hocr: '0',
-        tessjs_create_tsv: '0',
+        tessedit_pageseg_mode: '6' as any,
+        tessedit_char_whitelist: '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-,$ ',
       });
 
       const { data: { text } } = await worker.recognize(canvas);
@@ -154,44 +149,59 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
       const vWidth = video.videoWidth;
       const vHeight = video.videoHeight;
 
-      // El cuadro visual es 92% ancho y 25% alto. 
-      const cropW = vWidth * 0.92;
-      const cropH = vHeight * 0.25;
+      // Área de captura ligeramente más amplia para capturar tickets enteros
+      const cropW = vWidth * 0.94;
+      const cropH = vHeight * 0.35;
       const cropX = (vWidth - cropW) / 2;
       const cropY = (vHeight - cropH) / 2;
 
-      // Resolución ULTRA ALTA para máxima definición de bordes
       canvas.width = 2400;
       canvas.height = (cropH / cropW) * 2400;
 
-      // Fase 1: Filtros de contexto (Mejora visual para el usuario si se viera)
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       ctx.filter = `contrast(${contrast}) grayscale(1) brightness(${brightness})`;
       ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
       
-      // Fase 2: Binarización Manual (Clave para precisión Tesseract)
       applyThreshold(ctx, canvas.width, canvas.height);
       
       const text = await processLocalOcr(canvas);
       
-      // Limpieza profunda de ruido común en UUIDs
-      const normalized = text.toLowerCase().replace(/[^a-z0-9-]/g, '').trim();
-      
-      // Patrón específico para Yoshi Cash (ej: tick-...) o folios largos
-      const matches = normalized.match(/tick-[a-z0-9-]{10,64}|[a-z0-9-]{8,64}/gi) || [];
-      const cleanMatches = Array.from(new Set(matches.map(m => m.toLowerCase())));
+      // Dividir el texto en líneas y limpiar ruido
+      const lines = text.split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length >= 2);
 
-      if (cleanMatches.length > 0) {
-        setResults(cleanMatches);
-        showPopMessage("Precisión alta: Código detectado", "success");
-      } else {
-        if (normalized.length > 6) {
-          setResults([normalized]);
-          showPopMessage("Lectura completada", "success");
-        } else {
-          showPopMessage("Informa: Intenta centrar más el código", "info");
+      // Extraer tokens significativos (números de moneda, folios, palabras)
+      const foundItems: string[] = [];
+      
+      lines.forEach(line => {
+        // Buscar importes monetarios (ej: 1,200.50)
+        const moneyMatches = line.match(/\d{1,3}(,\d{3})*(\.\d{2})?|\d+(\.\d+)?/g);
+        if (moneyMatches) moneyMatches.forEach(m => {
+          if (m.length > 1) foundItems.push(m);
+        });
+
+        // Buscar folios alfanuméricos largos
+        const alphaMatches = line.match(/[a-z0-9-]{6,64}/gi);
+        if (alphaMatches) alphaMatches.forEach(m => foundItems.push(m));
+        
+        // Agregar la línea completa si parece un folio único
+        if (line.length > 5 && line.length < 50) {
+          foundItems.push(line);
         }
+      });
+
+      // Eliminar duplicados y normalizar
+      const cleanResults = Array.from(new Set(foundItems))
+        .map(item => item.replace(/[^a-z0-9.-]/gi, '')) // Limpiar caracteres extraños excepto puntos y guiones
+        .filter(item => item.length >= 2 && !/^[.-]+$/.test(item));
+
+      if (cleanResults.length > 0) {
+        setResults(cleanResults);
+        showPopMessage("Elementos detectados", "success");
+      } else {
+        showPopMessage("No se encontró texto claro. Intenta otro ángulo.", "info");
       }
     } catch (err) {
       showPopMessage("Error en el motor de visión", "error");
@@ -212,9 +222,8 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           className={`w-full h-full object-cover transition-all duration-700 ${isScanning ? 'opacity-30 blur-md' : 'opacity-100'}`} 
         />
         
-        {/* Guía Visual con Animación de Escaneo */}
         <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
-          <div className="w-[92%] h-[25%] border-2 border-white/20 rounded-3xl relative shadow-[0_0_0_2000px_rgba(0,0,0,0.85)]">
+          <div className="w-[92%] h-[35%] border-2 border-white/20 rounded-3xl relative shadow-[0_0_0_2000px_rgba(0,0,0,0.85)]">
             <div className="absolute -top-1 -left-1 w-14 h-14 border-t-4 border-l-4 border-[#bd004d] rounded-tl-3xl"></div>
             <div className="absolute -top-1 -right-1 w-14 h-14 border-t-4 border-r-4 border-[#bd004d] rounded-tr-3xl"></div>
             <div className="absolute -bottom-1 -left-1 w-14 h-14 border-b-4 border-l-4 border-[#bd004d] rounded-bl-3xl"></div>
@@ -227,12 +236,11 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           
           <div className="mt-12 text-center px-10">
             <p className="text-white font-black text-[11px] uppercase tracking-[0.6em] opacity-80 animate-pulse">
-              {isScanning ? `MODO PRECISIÓN: ${ocrProgress}%` : 'MANTÉN EL DISPOSITIVO FIRME'}
+              {isScanning ? `LEYENDO TEXTO: ${ocrProgress}%` : 'ENCUADRA TEXTO O NÚMEROS'}
             </p>
           </div>
         </div>
 
-        {/* Controles Flotantes */}
         <div className="absolute top-12 left-0 w-full px-6 flex justify-between items-center pointer-events-auto">
           <div className="flex gap-3">
             {hasFlash && (
@@ -270,7 +278,6 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           </button>
         </div>
 
-        {/* Sliders de Ajuste Fino */}
         {showSettings && (
           <div className="absolute top-32 left-6 right-6 p-8 bg-black/90 backdrop-blur-3xl rounded-[3rem] border border-white/10 space-y-8 animate-in slide-in-from-top-6 duration-300">
             <div className="space-y-4">
@@ -305,8 +312,8 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           <div className="space-y-8 animate-in slide-in-from-bottom-6 duration-300">
             <div className="text-center">
               <div className="w-14 h-1.5 bg-gray-800 rounded-full mx-auto mb-8"></div>
-              <p className="text-[#bd004d] text-[11px] font-black uppercase tracking-[0.4em] mb-2">Lectura Exitosa</p>
-              <p className="text-white/30 text-[10px]">Confirma el código tocándolo</p>
+              <p className="text-[#bd004d] text-[11px] font-black uppercase tracking-[0.4em] mb-2">Resultados Detectados</p>
+              <p className="text-white/30 text-[10px]">Toca el valor que deseas capturar</p>
             </div>
             
             <div className="grid gap-4 max-h-60 overflow-y-auto custom-scrollbar px-2">
@@ -325,7 +332,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
               onClick={() => setResults([])}
               className="w-full py-3 text-white/20 text-[10px] font-black uppercase tracking-[0.5em] hover:text-white transition-colors"
             >
-              Re-escanear Ticket
+              Capturar de nuevo
             </button>
           </div>
         ) : (
@@ -342,7 +349,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
               {isScanning ? (
                 <>
                   <div className="w-7 h-7 border-4 border-white/10 border-t-white rounded-full animate-spin"></div>
-                  <span>EXTRAYENDO...</span>
+                  <span>PROCESANDO...</span>
                 </>
               ) : (
                 <>
@@ -354,7 +361,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
                 </>
               )}
             </button>
-            <p className="text-white/5 text-[8px] font-bold tracking-[0.8em] uppercase">Powered by High-Precision Local OCR 6.0</p>
+            <p className="text-white/5 text-[8px] font-bold tracking-[0.8em] uppercase">Universal Visual Reader 7.0</p>
           </div>
         )}
       </div>
