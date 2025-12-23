@@ -29,6 +29,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
     let active = true;
     const initWorker = async () => {
       try {
+        // Inicialización rápida: solo inglés y sin logs de sistema pesados
         const worker = await createWorker('eng', 1, {
           logger: m => {
             if (m.status === 'recognizing text' && active) {
@@ -37,12 +38,13 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           }
         });
         
+        // Parámetros de alta velocidad
         await worker.setParameters({
-          tessedit_pageseg_mode: '6' as any,
+          tessedit_pageseg_mode: '6' as any, // Asumir bloque de texto uniforme
           tessedit_char_whitelist: '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-,$ ',
-          tessedit_ocr_engine_mode: '1' as any,
-          tessedit_do_invert: '0',
-          tessjs_create_hocr: '0',
+          tessedit_ocr_engine_mode: '1' as any, // Motor LSTM (Más rápido y preciso para texto moderno)
+          tessedit_do_invert: '0', // No perder tiempo intentando invertir colores internamente
+          tessjs_create_hocr: '0', // Desactivar generación de metadatos pesados
           tessjs_create_tsv: '0',
           tessjs_create_box: '0',
           tessjs_create_unlv: '0',
@@ -141,6 +143,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
     const imageData = ctx.getImageData(0, 0, width, height);
     const data = imageData.data;
     for (let i = 0; i < data.length; i += 4) {
+      // Método de luminosidad rápida (Avg simplificado)
       const brightness = (data[i] + data[i + 1] + data[i + 2]) / 3;
       const val = brightness < 128 ? 0 : 255;
       data[i] = data[i + 1] = data[i + 2] = val;
@@ -168,11 +171,13 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
       const cropX = (vWidth - cropW) / 2;
       const cropY = (vHeight - cropH) / 2;
 
+      // REDUCCIÓN DE RESOLUCIÓN PARA VELOCIDAD: 1600px es el punto óptimo (Sweet spot)
       canvas.width = 1600;
       canvas.height = (cropH / cropW) * 1600;
 
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
+      // Filtros nativos de Canvas son mucho más rápidos que loops manuales en JS
       ctx.filter = `contrast(${contrast}) grayscale(1) brightness(${brightness}) blur(0.1px)`;
       ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
       
@@ -248,11 +253,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           </div>
           <div className="mt-12 text-center px-10">
             <p className="text-white font-black text-[11px] uppercase tracking-[0.6em] opacity-80 animate-pulse">
-<<<<<<< HEAD
-              {!isWorkerReady ? 'INICIALIZANDO...' : isScanning ? `ANALIZANDO: ${ocrProgress}%` : 'ANALIZANDO'}
-=======
-              {!isWorkerReady ? 'INICIALIZANDO...' : isScanning ? `UNIDIRECCIONAL: ${ocrProgress}%` : 'MODO FUSIÓN DE RENGLONES'}
->>>>>>> 532696df674da99fb303dba6313ff7f6cf907b44
+              {!isWorkerReady ? 'INICIALIZANDO...' : isScanning ? `PROCESANDO: ${ocrProgress}%` : 'MODO RÁPIDO ACTIVO'}
             </p>
           </div>
         </div>
