@@ -199,14 +199,14 @@ const App: React.FC = () => {
         />
       )}
 
-      <header className="py-12 text-center flex flex-col items-center relative">
-        <div className="bg-white p-5 rounded-[2rem] shadow-sm mb-4 border border-gray-100/50">
+      <header className="py-10 text-center flex flex-col items-center relative">
+        <div className="bg-white p-5 rounded-[2.5rem] shadow-sm mb-4 border border-gray-100/50">
           <YoshiLogo className="h-14 w-14" />
         </div>
         <h1 className="text-2xl font-extrabold text-gray-900 font-title tracking-tight">Yoshi Cash</h1>
         <div className="flex items-center gap-2 mt-1">
           <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-          <p className="text-[#bd004d] font-black uppercase tracking-widest text-[9px]">Digitalizador de QR</p>
+          <p className="text-[#bd004d] font-black uppercase tracking-widest text-[10px]">Digitalizador de QR</p>
         </div>
       </header>
 
@@ -214,7 +214,7 @@ const App: React.FC = () => {
         <div className="bg-white rounded-[2.5rem] p-7 shadow-xl border border-gray-100">
           <div className="space-y-6">
             <div>
-              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">SALDO (OPCIONAL)</label>
+              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">Saldo (Opcional)</label>
               <div className="relative flex items-center">
                 <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
                 <input 
@@ -227,12 +227,12 @@ const App: React.FC = () => {
             </div>
             
             <div>
-              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">TICKET</label>
+              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">Código del Ticket</label>
               <div className="relative flex items-center">
                 <input 
                   type="text" name="codigo" value={formData.codigo} onChange={handleInputChange} 
                   className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[#bd004d]/10 font-bold text-gray-700 transition-all pr-14 placeholder:font-normal" 
-                  placeholder="Número de ticket" 
+                  placeholder="Ej: tick-a1b2..." 
                 />
                 <button 
                   onClick={() => openScanner('codigo')}
@@ -249,11 +249,8 @@ const App: React.FC = () => {
             <div className="flex gap-4">
               <button 
                 onClick={handleGenerate}
-                className="flex-1 bg-[#bd004d] text-white py-4 rounded-2xl font-bold shadow-lg shadow-[#bd004d]/20 active:scale-95 transition-transform uppercase flex items-center justify-center gap-2"
+                className="flex-1 bg-[#bd004d] text-white py-4 rounded-2xl font-bold shadow-lg shadow-[#bd004d]/20 active:scale-95 transition-transform uppercase flex items-center justify-center gap-2 text-xs tracking-widest"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                </svg>
                 GENERAR TICKET
               </button>
               <button 
@@ -275,46 +272,32 @@ const App: React.FC = () => {
             
             <div className="bg-white rounded-[2.5rem] p-7 shadow-xl border border-gray-100 space-y-6">
               <div>
-                <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">WhatsApp de Envío (Teléfono)</label>
+                <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">WhatsApp de Envío</label>
                 <input 
                   type="tel" name="phone" value={formData.phone} onChange={handleInputChange}
                   className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none font-bold text-gray-700 focus:ring-2 focus:ring-[#bd004d]/10 transition-all placeholder:font-normal" 
-                  placeholder="Ej: 521..." 
+                  placeholder="521..." 
                 />
               </div>
               
-              <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <button 
                   onClick={handleSend}
                   disabled={isProcessing}
-                  className="w-full h-16 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_15px_35px_rgba(189,0,77,0.35)] active:scale-95 transition-all text-sm uppercase tracking-[0.25em] flex items-center justify-center gap-3 disabled:opacity-50"
+                  className="bg-[#25D366] text-white font-black rounded-2xl h-16 shadow-lg active:scale-95 transition-all text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {isProcessing ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-                      </svg>
-                      Enviar a WhatsApp
-                    </>
-                  )}
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  ) : "WhatsApp"}
                 </button>
                 <button 
                   onClick={() => processAndShareTicket(true)}
                   disabled={isProcessing}
-                  className="w-full h-16 bg-[#bd004d] text-white font-black rounded-2xl shadow-[0_15px_35px_rgba(189,0,77,0.35)] active:scale-95 transition-all text-sm uppercase tracking-[0.25em] flex items-center justify-center gap-3 disabled:opacity-50"
+                  className="bg-[#bd004d] text-white font-black rounded-2xl h-16 shadow-lg active:scale-95 transition-all text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                    {isProcessing ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  ) : (
-                    <>
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                      </svg>
-                      COMPARTIR
-                    </>
-                  )}
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  ) : "Compartir"}
                 </button>
               </div>
             </div>
