@@ -20,7 +20,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
   const [ocrProgress, setOcrProgress] = useState(0);
   
   const [brightness, setBrightness] = useState(1.1);
-  const [contrast, setContrast] = useState(2.3);
+  const [contrast, setContrast] = useState(2.4); // Aumentado ligeramente para mejor lectura de texto pequeño
   const [showSettings, setShowSettings] = useState(false);
 
   const stopCamera = useCallback(() => {
@@ -97,8 +97,11 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
     }
   };
 
+  /**
+   * Filtro de nitidez (Sharpen) para caracteres finos y pequeños.
+   * Ayuda crucial para distinguir '1' de 'l'.
+   */
   const sharpen = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    // Matriz de nitidez más agresiva para distinguir 1 de l
     const weights = [
        0, -1,  0,
       -1,  5, -1,
@@ -144,8 +147,8 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
     const data = imageData.data;
     for (let i = 0; i < data.length; i += 4) {
       const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-      // Umbral ajustado para maximizar contraste de caracteres finos
-      const val = avg < 128 ? 0 : 255;
+      // Umbral específico para texto negro sobre fondo claro
+      const val = avg < 130 ? 0 : 255;
       data[i] = data[i + 1] = data[i + 2] = val;
     }
     ctx.putImageData(imageData, 0, 0);
@@ -161,10 +164,11 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
         }
       });
       
+      // Parametrización avanzada de Tesseract
       await worker.setParameters({
-        tessedit_pageseg_mode: '6' as any,
+        tessedit_pageseg_mode: '6' as any, // Asumir un bloque único de texto uniforme
         tessedit_char_whitelist: '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-,$ ',
-        tessedit_ocr_engine_mode: '1' as any, // LSTM es mucho mejor para distinguir 1 de l por contexto
+        tessedit_ocr_engine_mode: '1' as any, // Motor LSTM para precisión contextual (mejor 1 vs l)
       });
 
       const { data: { text } } = await worker.recognize(canvas);
@@ -192,19 +196,22 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
       const vWidth = video.videoWidth;
       const vHeight = video.videoHeight;
 
+      // Definir área de interés (el rectángulo de la cámara)
       const cropW = vWidth * 0.94;
       const cropH = vHeight * 0.35;
       const cropX = (vWidth - cropW) / 2;
       const cropY = (vHeight - cropH) / 2;
 
-      canvas.width = 3200;
-      canvas.height = (cropH / cropW) * 3200;
+      // AUMENTO DE RESOLUCIÓN MASIVO para capturar detalles ínfimos
+      canvas.width = 3400;
+      canvas.height = (cropH / cropW) * 3400;
 
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       ctx.filter = `contrast(${contrast}) grayscale(1) brightness(${brightness})`;
       ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
       
+      // Pre-procesamiento de imagen
       sharpen(ctx, canvas.width, canvas.height);
       applyThreshold(ctx, canvas.width, canvas.height);
       
@@ -217,15 +224,15 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
       let foundItems: string[] = [];
       
       lines.forEach(line => {
-        // Buscar específicamente el patrón de Yoshi 'tick-'
+        // Buscar patrón 'tick-' (prioridad absoluta)
         const tickMatches = line.match(/tick-[a-z0-9-]{10,64}/gi);
         if (tickMatches) foundItems.push(...tickMatches);
 
-        // Buscar UUIDs genéricos o folios largos
-        const genericMatches = line.match(/[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}/gi);
-        if (genericMatches) foundItems.push(...genericMatches);
+        // Buscar UUIDs genéricos
+        const uuidMatches = line.match(/[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}/gi);
+        if (uuidMatches) foundItems.push(...uuidMatches);
 
-        // Importes
+        // Buscar importes de saldo
         const moneyMatches = line.match(/\d{1,3}(,\d{3})*(\.\d{2})?|\d+(\.\d+)?/g);
         if (moneyMatches) {
           moneyMatches.forEach(m => {
@@ -233,17 +240,22 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           });
         }
 
-        // Cadenas alfanuméricas generales
-        const alphaMatches = line.match(/[a-z0-9-]{4,64}/gi);
-        if (alphaMatches) foundItems.push(...alphaMatches);
+        // Otras cadenas alfanuméricas relevantes
+        const genericAlpha = line.match(/[a-z0-9-]{4,64}/gi);
+        if (genericAlpha) foundItems.push(...genericAlpha);
       });
 
-      // Limpieza y deduplicación preservando case
+      // Limpieza y deduplicación preservando mayúsculas/minúsculas
       const uniqueResults = Array.from(new Set(foundItems))
         .map(item => item.replace(/[^a-z0-9.-]/gi, ''))
         .filter(item => item.length >= 2 && !/^[.-]+$/.test(item));
 
-      // PRIORIZACIÓN: Primero las cadenas más largas y las que contienen 'tick-'
+      /**
+       * Lógica de Priorización:
+       * 1. Cadenas que contienen 'tick-' (el formato objetivo)
+       * 2. Cadenas más largas primero (normalmente son los UUIDs)
+       * 3. Otros valores
+       */
       const sortedResults = uniqueResults.sort((a, b) => {
         const aIsTick = a.toLowerCase().includes('tick-');
         const bIsTick = b.toLowerCase().includes('tick-');
@@ -251,14 +263,14 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
         if (aIsTick && !bIsTick) return -1;
         if (!aIsTick && bIsTick) return 1;
         
-        return b.length - a.length; // Las más largas primero
+        return b.length - a.length; 
       });
 
       if (sortedResults.length > 0) {
         setResults(sortedResults);
-        showPopMessage("Lectura de alta precisión", "success");
+        showPopMessage("Lectura de precisión lograda", "success");
       } else {
-        showPopMessage("No se detectaron códigos. Intenta de nuevo.", "info");
+        showPopMessage("No se detectaron códigos. Acerca más el ticket.", "info");
       }
     } catch (err) {
       showPopMessage("Error en motor de visión", "error");
@@ -293,7 +305,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           
           <div className="mt-12 text-center px-10">
             <p className="text-white font-black text-[11px] uppercase tracking-[0.6em] opacity-80 animate-pulse">
-              {isScanning ? `ANALIZANDO: ${ocrProgress}%` : 'DISTINGUIENDO 1 DE L | PRIORIDAD UUID'}
+              {isScanning ? `ANALIZANDO: ${ocrProgress}%` : 'SENSITIVITY MODE: 1 VS L | CASE-SENSITIVE'}
             </p>
           </div>
         </div>
@@ -369,7 +381,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           <div className="space-y-8 animate-in slide-in-from-bottom-6 duration-300">
             <div className="text-center">
               <div className="w-14 h-1.5 bg-gray-800 rounded-full mx-auto mb-8"></div>
-              <p className="text-[#bd004d] text-[11px] font-black uppercase tracking-[0.4em] mb-2">Cadenas Priorizadas</p>
+              <p className="text-[#bd004d] text-[11px] font-black uppercase tracking-[0.4em] mb-2">Resultados Priorizados</p>
               <p className="text-white/30 text-[10px]">Toca el folio para seleccionarlo</p>
             </div>
             
@@ -408,7 +420,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
               {isScanning ? (
                 <>
                   <div className="w-7 h-7 border-4 border-white/10 border-t-white rounded-full animate-spin"></div>
-                  <span>ANALIZANDO TEXTO...</span>
+                  <span>ANALIZANDO IMAGEN...</span>
                 </>
               ) : (
                 <>
@@ -420,7 +432,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
                 </>
               )}
             </button>
-            <p className="text-white/5 text-[8px] font-bold tracking-[0.8em] uppercase">Hyper Precision Reader v10.0</p>
+            <p className="text-white/5 text-[8px] font-bold tracking-[0.8em] uppercase">Hyper Precision OCR v11.0</p>
           </div>
         )}
       </div>
