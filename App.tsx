@@ -41,7 +41,6 @@ const App: React.FC = () => {
       parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
       processedValue = parts.join('.');
     }
-    // Nota: Ya no se aplica .toLowerCase() al ticket para permitir distinción de mayúsculas/minúsculas
     
     setFormData(prev => ({ ...prev, [name]: processedValue }));
   };
@@ -207,7 +206,7 @@ const App: React.FC = () => {
         <h1 className="text-2xl font-extrabold text-gray-900 font-title tracking-tight">Yoshi Cash</h1>
         <div className="flex items-center gap-2 mt-1">
           <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-          <p className="text-[#bd004d] font-black uppercase tracking-widest text-[9px]">Generador de Tickets Digitales</p>
+          <p className="text-[#bd004d] font-black uppercase tracking-widest text-[9px]">Digitalizador de QR</p>
         </div>
       </header>
 
