@@ -280,7 +280,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           </div>
           <div className="mt-12 text-center px-10">
             <p className="text-white font-black text-[11px] uppercase tracking-[0.6em] opacity-80 animate-pulse">
-              {!isWorkerReady ? 'INICIALIZANDO...' : isScanning ? `UNIDIRECCIONAL: ${ocrProgress}%` : 'MODO FUSIÓN DE RENGONES'}
+              {!isWorkerReady ? 'INICIALIZANDO...' : isScanning ? `UNIDIRECCIONAL: ${ocrProgress}%` : 'MODO FUSIÓN DE RENGLONES'}
             </p>
           </div>
         </div>
