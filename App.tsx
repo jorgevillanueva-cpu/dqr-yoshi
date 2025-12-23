@@ -64,7 +64,7 @@ const App: React.FC = () => {
 
   const handleGenerate = () => {
     if (!formData.codigo.trim()) {
-      showPopMessage("Ingresa Código de Ticket", 'info');
+      showPopMessage("Ingresa el Ticket", 'info');
       return;
     }
     formatSaldoOnComplete();
@@ -95,8 +95,8 @@ const App: React.FC = () => {
           const file = new File([blob], fileName, { type: 'image/png' });
           
           const shareText = isGeneralShare 
-            ? `Ticket Yoshi Cash - Folio: ${formData.codigo}`
-            : `Ticket para el número: ${formData.phone}\nFolio: ${formData.codigo}`;
+            ? `Ticket Yoshi Cash - Ticket: ${formData.codigo}`
+            : `Ticket para el número: ${formData.phone}\nTicket: ${formData.codigo}`;
 
           const shareData: ShareData = {
             files: [file],
@@ -190,7 +190,6 @@ const App: React.FC = () => {
             if (scannerTarget === 'codigo') {
               setFormData(prev => ({ ...prev, codigo: code.toLowerCase() }));
             } else {
-              // Limpiar de símbolos monetarios y formatear
               const cleanValue = code.replace(/[^\d.]/g, '');
               setFormData(prev => ({ ...prev, saldo: cleanValue }));
             }
@@ -206,7 +205,7 @@ const App: React.FC = () => {
         <h1 className="text-2xl font-extrabold text-gray-900 font-title tracking-tight">Yoshi Cash</h1>
         <div className="flex items-center gap-2 mt-1">
           <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-          <p className="text-[#bd004d] font-black uppercase tracking-widest text-[9px]">Lector de Texto e Importes</p>
+          <p className="text-[#bd004d] font-black uppercase tracking-widest text-[9px]">Generador de Tickets Digitales</p>
         </div>
       </header>
 
@@ -214,34 +213,25 @@ const App: React.FC = () => {
         <div className="bg-white rounded-[2.5rem] p-7 shadow-xl border border-gray-100">
           <div className="space-y-6">
             <div>
-              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">Saldo / Importe</label>
+              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">SALDO (OPCIONAL)</label>
               <div className="relative flex items-center">
                 <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
                 <input 
                   type="text" name="saldo" value={formData.saldo} 
                   onChange={handleInputChange} onBlur={formatSaldoOnComplete} inputMode="decimal"
-                  className="w-full pl-10 pr-14 py-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[#bd004d]/10 font-bold text-gray-700 transition-all placeholder:font-normal" 
+                  className="w-full pl-10 pr-5 py-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[#bd004d]/10 font-bold text-gray-700 transition-all placeholder:font-normal" 
                   placeholder="0.00" 
                 />
-                <button 
-                  onClick={() => openScanner('saldo')}
-                  className="absolute right-2 p-2.5 text-[#bd004d] hover:bg-[#bd004d]/5 rounded-xl transition-colors"
-                  title="Escanear Importe"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812-1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                  </svg>
-                </button>
               </div>
             </div>
             
             <div>
-              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">Ticket / Folio</label>
+              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">TICKET</label>
               <div className="relative flex items-center">
                 <input 
                   type="text" name="codigo" value={formData.codigo} onChange={handleInputChange} 
                   className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none lowercase focus:ring-2 focus:ring-[#bd004d]/10 font-bold text-gray-700 transition-all pr-14 placeholder:font-normal" 
-                  placeholder="Código o referencia" 
+                  placeholder="Número de ticket" 
                 />
                 <button 
                   onClick={() => openScanner('codigo')}
@@ -319,9 +309,9 @@ const App: React.FC = () => {
                   ) : (
                     <>
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                       </svg>
-                      Compartir Imagen
+                      COMPARTIR
                     </>
                   )}
                 </button>
