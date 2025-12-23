@@ -96,22 +96,25 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           contents: {
             parts: [
               { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
-              { text: "Lee este ticket. Busca el FOLIO, REFERENCIA, TICKET # o ID. Extrae solo los códigos alfanuméricos únicos. Devuelve los códigos encontrados separados por comas. Si el texto es borroso, intenta deducir los caracteres. No incluyas explicaciones." }
+              { text: "Busca y extrae el FOLIO o CÓDIGO de este ticket. Es una cadena alfanumérica (ej. ABC-1234, 098765). Devuelve SOLO los códigos separados por comas. Si no estás seguro, intenta leer los caracteres más claros." }
             ]
           },
           config: {
-            systemInstruction: "Eres un experto en digitalización de tickets. Tu misión es encontrar códigos de identificación. Responde únicamente con los folios, sin texto adicional.",
-            temperature: 0, // Más determinista
+            systemInstruction: "Eres un sistema OCR de alta fidelidad. Tu prioridad es encontrar códigos de folio en tickets de compra. Ignora logotipos, montos y fechas. Responde exclusivamente con los códigos encontrados.",
+            temperature: 0,
           }
         });
         
         return response.text || "";
       } catch (err: any) {
         lastError = err;
-        if (err?.status === 401 || err?.status === 403) {
+        // Si es error de API Key, abrir selector
+        if (err?.status === 401 || err?.status === 403 || err?.message?.includes("API key")) {
           if (window.aistudio) await window.aistudio.openSelectKey();
+          break;
         }
-        if (i < retries) await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+        // Esperar antes de reintentar
+        if (i < retries) await new Promise(r => setTimeout(r, 1500));
       }
     }
     throw lastError;
@@ -130,37 +133,42 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
       const context = canvas.getContext('2d', { willReadFrequently: true });
       if (!context) return;
 
-      const TARGET_WIDTH = 1024; 
+      // Aumento de resolución a 1280 para mayor detalle en fuentes pequeñas
+      const TARGET_WIDTH = 1280; 
       const scale = TARGET_WIDTH / video.videoWidth;
       canvas.width = TARGET_WIDTH;
       canvas.height = video.videoHeight * scale;
 
-      // --- MEJORA DE IMAGEN (FILTRO DE CONTRASTE) ---
-      // Dibujamos con un filtro para ayudar al OCR en condiciones de baja luz
-      context.filter = 'contrast(1.4) brightness(1.1)';
+      // Filtros optimizados para tickets térmicos (contraste alto)
+      context.filter = 'contrast(1.6) brightness(1.05) saturate(0)';
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      const base64Image = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+      const base64Image = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
 
       const responseText = await performOcrWithRetry(base64Image);
       
-      if (!responseText.trim()) {
-        showPopMessage("No se encontró texto claro. Limpia la lente o mejora la luz.", "info");
+      if (!responseText || !responseText.trim()) {
+        showPopMessage("No se detectó el folio. Intenta acercar o alejar un poco.", "info");
       } else {
-        // Limpiamos la respuesta para extraer solo caracteres alfanuméricos que parezcan folios
+        // Limpieza robusta de la respuesta
         const found = responseText.split(/[\s,]+/)
           .map(s => s.replace(/[^a-zA-Z0-9-]/g, '').trim())
-          .filter(s => s.length >= 4 && !/error|sorry|unable|safety|blocked|folio|ticket|referencia/i.test(s));
+          .filter(s => s.length >= 4 && !/error|sorry|unable|safety|blocked|folio|ticket|referencia|id/i.test(s));
         
         if (found.length > 0) {
           setResults(Array.from(new Set(found)));
-          showPopMessage("Digitalización exitosa", "success");
+          showPopMessage("Ticket leído correctamente", "success");
         } else {
-          showPopMessage("No se detectaron folios válidos. Reintenta.", "info");
+          showPopMessage("Folio no reconocido. Asegúrate que esté enfocado.", "info");
         }
       }
     } catch (err: any) {
-      showPopMessage("Error de análisis. Acerca más el ticket.", "error");
+      console.error("OCR Error:", err);
+      if (err?.message?.includes("fetch")) {
+        showPopMessage("Revisa tu conexión a internet.", "error");
+      } else {
+        showPopMessage("Error al procesar. Reintenta con más luz.", "error");
+      }
     } finally {
       setIsScanning(false);
     }
@@ -190,14 +198,14 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
             
             <div className="absolute inset-0 flex items-center justify-center">
                <div className="bg-black/40 backdrop-blur-xl px-6 py-3 rounded-full border border-white/20 shadow-2xl">
-                  <p className="text-white text-[10px] font-black uppercase tracking-[0.4em]">CAPTURA EL FOLIO</p>
+                  <p className="text-white text-[10px] font-black uppercase tracking-[0.4em]">ENCUADRA EL TICKET</p>
                </div>
             </div>
           </div>
           
           <div className="mt-12 flex flex-col items-center gap-2">
             <p className="text-white/80 font-bold text-[11px] uppercase tracking-[0.2em] text-center px-10 leading-relaxed">
-              {isScanning ? 'LA IA ESTÁ LEYENDO TU TICKET...' : 'EVITA REFLEJOS Y MEJORA LA LUZ'}
+              {isScanning ? 'LEYENDO TICKET...' : 'COLOCA EL CÓDIGO DENTRO DEL RECUADRO'}
             </p>
           </div>
         </div>
@@ -232,8 +240,8 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           <div className="space-y-6 animate-in slide-in-from-bottom-6 duration-500">
             <div className="text-center">
               <div className="w-12 h-1 bg-gray-800 rounded-full mx-auto mb-6"></div>
-              <p className="text-[#bd004d] text-[11px] font-black uppercase tracking-[0.2em] mb-1">Folios Detectados</p>
-              <p className="text-white/40 text-[11px] font-medium">Confirma el folio de tu ticket</p>
+              <p className="text-[#bd004d] text-[11px] font-black uppercase tracking-[0.2em] mb-1">Folios Encontrados</p>
+              <p className="text-white/40 text-[11px] font-medium">Toca el folio correcto</p>
             </div>
             
             <div className="flex flex-col gap-3 max-h-64 overflow-y-auto custom-scrollbar pr-1">
@@ -252,7 +260,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
               onClick={() => { setResults([]); setIsScanning(false); }}
               className="w-full py-4 text-white/40 text-[10px] font-black uppercase tracking-[0.3em] flex items-center justify-center gap-2 hover:text-white"
             >
-              Intentar de nuevo
+              Volver a intentar
             </button>
           </div>
         ) : (
@@ -280,7 +288,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
                 </>
               )}
             </button>
-            <span className="text-white/20 text-[8px] font-bold tracking-[0.5em] uppercase">Powered by AI Vision v2.5</span>
+            <span className="text-white/20 text-[8px] font-bold tracking-[0.5em] uppercase">Gemini Vision AI Core</span>
           </div>
         )}
       </div>
