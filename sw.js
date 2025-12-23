@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'yoshicash-v11';
+const CACHE_NAME = 'yoshicash-v12';
 const ASSETS = [
   './',
   'index.html',
@@ -33,13 +33,20 @@ self.addEventListener('fetch', (event) => {
     caches.match(event.request).then((cached) => {
       const networked = fetch(event.request)
         .then((response) => {
+          // Si la respuesta es válida, la guardamos en cache
           if (response && response.status === 200) {
             const cacheCopy = response.clone();
             caches.open(CACHE_NAME).then(cache => cache.put(event.request, cacheCopy));
           }
           return response;
         })
-        .catch(() => cached);
+        .catch(() => {
+          // Si falla la red y es una navegación, devolvemos index.html para evitar el 404
+          if (event.request.mode === 'navigate') {
+            return caches.match('index.html');
+          }
+          return cached;
+        });
 
       return cached || networked;
     })

@@ -17,7 +17,35 @@ const App: React.FC = () => {
   const [scannerTarget, setScannerTarget] = useState<'saldo' | 'codigo'>('codigo');
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
 
+  // Estados para PWA Installation
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+
   const ticketRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Detectar iOS
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIOS(ios);
+
+    // Manejar el evento de instalación de Chrome/Android
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBanner(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+    
+    // Si es iOS y no está en modo standalone, mostrar sugerencia
+    if (ios && !(window.navigator as any).standalone) {
+      const timer = setTimeout(() => setShowInstallBanner(true), 3000);
+      return () => clearTimeout(timer);
+    }
+
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
 
   useEffect(() => {
     if (toast) {
@@ -25,6 +53,19 @@ const App: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [toast]);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setShowInstallBanner(false);
+      }
+      setDeferredPrompt(null);
+    } else if (isIOS) {
+      showPopMessage("Toca 'Compartir' y luego 'Añadir a pantalla de inicio'", 'info');
+    }
+  };
 
   const showPopMessage = (message: string, type: 'error' | 'success' | 'info' = 'info') => {
     setToast({ message, type });
@@ -171,6 +212,30 @@ const App: React.FC = () => {
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-gray-50 pb-24 px-4 overflow-y-auto relative">
+      {/* Banner de Instalación */}
+      {showInstallBanner && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[150] w-[90%] max-w-sm animate-in slide-in-from-bottom-6 duration-500">
+          <div className="bg-white p-5 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-[#bd004d]/10 flex items-center gap-4">
+            <div className="bg-[#bd004d]/5 p-3 rounded-2xl">
+              <YoshiLogo className="w-8 h-8" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-black text-gray-900 uppercase tracking-tighter leading-none">Instalar App</p>
+              <p className="text-[10px] text-gray-500 font-medium leading-tight mt-0.5">Usa Yoshi Cash desde tu pantalla de inicio.</p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setShowInstallBanner(false)} className="px-3 py-2 text-[10px] font-bold text-gray-400">Ahora no</button>
+              <button 
+                onClick={handleInstallClick}
+                className="bg-[#bd004d] text-white px-5 py-2.5 rounded-xl text-[10px] font-bold shadow-lg shadow-[#bd004d]/20 active:scale-95 transition-transform"
+              >
+                {isIOS ? '¿Cómo?' : 'Instalar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {toast && (
         <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] w-[90%] max-w-sm pointer-events-none animate-in fade-in slide-in-from-top-4 duration-300">
           <div className={`px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border backdrop-blur-md ${
