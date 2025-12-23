@@ -20,7 +20,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
   const [ocrProgress, setOcrProgress] = useState(0);
   
   const [brightness, setBrightness] = useState(1.1);
-  const [contrast, setContrast] = useState(2.2);
+  const [contrast, setContrast] = useState(2.3);
   const [showSettings, setShowSettings] = useState(false);
 
   const stopCamera = useCallback(() => {
@@ -98,6 +98,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
   };
 
   const sharpen = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+    // Matriz de nitidez más agresiva para distinguir 1 de l
     const weights = [
        0, -1,  0,
       -1,  5, -1,
@@ -114,14 +115,12 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
 
     for (let y = 0; y < sh; y++) {
       for (let x = 0; x < sw; x++) {
-        const sy = y;
-        const sx = x;
         const dstOff = (y * sw + x) * 4;
         let r = 0, g = 0, b = 0;
         for (let cy = 0; cy < side; cy++) {
           for (let cx = 0; cx < side; cx++) {
-            const scy = sy + cy - halfSide;
-            const scx = sx + cx - halfSide;
+            const scy = y + cy - halfSide;
+            const scx = x + cx - halfSide;
             if (scy >= 0 && scy < sh && scx >= 0 && scx < sw) {
               const srcOff = (scy * sw + scx) * 4;
               const wt = weights[cy * side + cx];
@@ -145,7 +144,8 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
     const data = imageData.data;
     for (let i = 0; i < data.length; i += 4) {
       const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-      const val = avg < 120 ? 0 : 255;
+      // Umbral ajustado para maximizar contraste de caracteres finos
+      const val = avg < 128 ? 0 : 255;
       data[i] = data[i + 1] = data[i + 2] = val;
     }
     ctx.putImageData(imageData, 0, 0);
@@ -161,12 +161,10 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
         }
       });
       
-      // PSM 6 es ideal para bloques de texto. 
-      // Whitelist incluye mayúsculas y minúsculas para "distinguir" entre ellas.
       await worker.setParameters({
         tessedit_pageseg_mode: '6' as any,
         tessedit_char_whitelist: '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-,$ ',
-        tessedit_ocr_engine_mode: '1' as any,
+        tessedit_ocr_engine_mode: '1' as any, // LSTM es mucho mejor para distinguir 1 de l por contexto
       });
 
       const { data: { text } } = await worker.recognize(canvas);
@@ -216,38 +214,51 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
         .map(l => l.trim())
         .filter(l => l.length >= 2);
 
-      const foundItems: string[] = [];
+      let foundItems: string[] = [];
       
       lines.forEach(line => {
-        // 1. Prioridad: Formato 'tick-XXXX-XXXX...'
+        // Buscar específicamente el patrón de Yoshi 'tick-'
         const tickMatches = line.match(/tick-[a-z0-9-]{10,64}/gi);
-        if (tickMatches) tickMatches.forEach(m => foundItems.push(m));
+        if (tickMatches) foundItems.push(...tickMatches);
 
-        // 2. Importes
+        // Buscar UUIDs genéricos o folios largos
+        const genericMatches = line.match(/[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}/gi);
+        if (genericMatches) foundItems.push(...genericMatches);
+
+        // Importes
         const moneyMatches = line.match(/\d{1,3}(,\d{3})*(\.\d{2})?|\d+(\.\d+)?/g);
-        if (moneyMatches) moneyMatches.forEach(m => {
-          if (m.length > 1) foundItems.push(m);
-        });
-
-        // 3. Folios alfanuméricos generales (preservando case)
-        const alphaMatches = line.match(/[a-z0-9-]{4,64}/gi);
-        if (alphaMatches) alphaMatches.forEach(m => foundItems.push(m));
-        
-        if (line.length >= 4 && line.length < 50) {
-          foundItems.push(line);
+        if (moneyMatches) {
+          moneyMatches.forEach(m => {
+             if (m.length > 2) foundItems.push(m);
+          });
         }
+
+        // Cadenas alfanuméricas generales
+        const alphaMatches = line.match(/[a-z0-9-]{4,64}/gi);
+        if (alphaMatches) foundItems.push(...alphaMatches);
       });
 
-      // Eliminamos duplicados pero SIN forzar minúsculas en el array final
-      const cleanResults = Array.from(new Set(foundItems))
-        .map(item => item.replace(/[^a-z0-9.-]/gi, '')) // Limpia ruido pero mantiene case vía regex [^a-z0-9.-]/gi
+      // Limpieza y deduplicación preservando case
+      const uniqueResults = Array.from(new Set(foundItems))
+        .map(item => item.replace(/[^a-z0-9.-]/gi, ''))
         .filter(item => item.length >= 2 && !/^[.-]+$/.test(item));
 
-      if (cleanResults.length > 0) {
-        setResults(cleanResults);
-        showPopMessage("Lectura completa", "success");
+      // PRIORIZACIÓN: Primero las cadenas más largas y las que contienen 'tick-'
+      const sortedResults = uniqueResults.sort((a, b) => {
+        const aIsTick = a.toLowerCase().includes('tick-');
+        const bIsTick = b.toLowerCase().includes('tick-');
+        
+        if (aIsTick && !bIsTick) return -1;
+        if (!aIsTick && bIsTick) return 1;
+        
+        return b.length - a.length; // Las más largas primero
+      });
+
+      if (sortedResults.length > 0) {
+        setResults(sortedResults);
+        showPopMessage("Lectura de alta precisión", "success");
       } else {
-        showPopMessage("No se detectó el ticket. Prueba otro ángulo.", "info");
+        showPopMessage("No se detectaron códigos. Intenta de nuevo.", "info");
       }
     } catch (err) {
       showPopMessage("Error en motor de visión", "error");
@@ -282,7 +293,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           
           <div className="mt-12 text-center px-10">
             <p className="text-white font-black text-[11px] uppercase tracking-[0.6em] opacity-80 animate-pulse">
-              {isScanning ? `MODO CASE-SENSITIVE: ${ocrProgress}%` : 'Distinguiendo mayúsculas y minúsculas'}
+              {isScanning ? `ANALIZANDO: ${ocrProgress}%` : 'DISTINGUIENDO 1 DE L | PRIORIDAD UUID'}
             </p>
           </div>
         </div>
@@ -328,24 +339,24 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           <div className="absolute top-32 left-6 right-6 p-8 bg-black/90 backdrop-blur-3xl rounded-[3rem] border border-white/10 space-y-8 animate-in slide-in-from-top-6 duration-300">
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-white text-[11px] font-black uppercase tracking-widest opacity-40">Compensación Brillo</span>
-                <span className="text-[#bd004d] font-mono text-sm font-bold">{brightness.toFixed(1)}</span>
+                <span className="text-white text-[11px] font-black uppercase tracking-widest opacity-40">Nitidez (Contraste)</span>
+                <span className="text-[#bd004d] font-mono text-sm font-bold">{contrast.toFixed(1)}</span>
               </div>
               <input 
-                type="range" min="0.5" max="2.0" step="0.1" 
-                value={brightness} onChange={(e) => setBrightness(parseFloat(e.target.value))}
+                type="range" min="1.0" max="5.0" step="0.2" 
+                value={contrast} onChange={(e) => setContrast(parseFloat(e.target.value))}
                 className="w-full accent-[#bd004d] h-2 bg-white/5 rounded-full appearance-none cursor-pointer"
               />
             </div>
             
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-white text-[11px] font-black uppercase tracking-widest opacity-40">Factor Contraste</span>
-                <span className="text-[#bd004d] font-mono text-sm font-bold">{contrast.toFixed(1)}</span>
+                <span className="text-white text-[11px] font-black uppercase tracking-widest opacity-40">Exposición</span>
+                <span className="text-[#bd004d] font-mono text-sm font-bold">{brightness.toFixed(1)}</span>
               </div>
               <input 
-                type="range" min="1.0" max="4.0" step="0.2" 
-                value={contrast} onChange={(e) => setContrast(parseFloat(e.target.value))}
+                type="range" min="0.5" max="2.5" step="0.1" 
+                value={brightness} onChange={(e) => setBrightness(parseFloat(e.target.value))}
                 className="w-full accent-[#bd004d] h-2 bg-white/5 rounded-full appearance-none cursor-pointer"
               />
             </div>
@@ -358,8 +369,8 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
           <div className="space-y-8 animate-in slide-in-from-bottom-6 duration-300">
             <div className="text-center">
               <div className="w-14 h-1.5 bg-gray-800 rounded-full mx-auto mb-8"></div>
-              <p className="text-[#bd004d] text-[11px] font-black uppercase tracking-[0.4em] mb-2">Resultados Alfanuméricos</p>
-              <p className="text-white/30 text-[10px]">Respeta mayúsculas y minúsculas detectadas</p>
+              <p className="text-[#bd004d] text-[11px] font-black uppercase tracking-[0.4em] mb-2">Cadenas Priorizadas</p>
+              <p className="text-white/30 text-[10px]">Toca el folio para seleccionarlo</p>
             </div>
             
             <div className="grid gap-4 max-h-60 overflow-y-auto custom-scrollbar px-2">
@@ -367,7 +378,9 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
                 <button
                   key={i}
                   onClick={() => onCodeSelected(res)}
-                  className="w-full py-6 px-6 bg-white/[0.04] border border-white/10 text-white font-mono text-base break-all rounded-[2rem] active:bg-[#bd004d] transition-all flex items-center justify-center text-center shadow-2xl"
+                  className={`w-full py-6 px-6 border font-mono text-base break-all rounded-[2rem] active:bg-[#bd004d] transition-all flex items-center justify-center text-center shadow-2xl ${
+                    res.toLowerCase().includes('tick-') ? 'bg-[#bd004d]/20 border-[#bd004d]/50 text-white' : 'bg-white/[0.04] border-white/10 text-white'
+                  }`}
                 >
                   {res}
                 </button>
@@ -395,7 +408,7 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
               {isScanning ? (
                 <>
                   <div className="w-7 h-7 border-4 border-white/10 border-t-white rounded-full animate-spin"></div>
-                  <span>ANALIZANDO...</span>
+                  <span>ANALIZANDO TEXTO...</span>
                 </>
               ) : (
                 <>
@@ -403,11 +416,11 @@ export const ScannerModule: React.FC<ScannerModuleProps> = ({ onCodeSelected, on
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812-1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                     <circle cx="12" cy="13" r="3" strokeWidth="2.5" />
                   </svg>
-                  <span>ESCANEAR AHORA</span>
+                  <span>ESCANEAR TICKET</span>
                 </>
               )}
             </button>
-            <p className="text-white/5 text-[8px] font-bold tracking-[0.8em] uppercase">Mixed Case Precision v9.0</p>
+            <p className="text-white/5 text-[8px] font-bold tracking-[0.8em] uppercase">Hyper Precision Reader v10.0</p>
           </div>
         )}
       </div>
