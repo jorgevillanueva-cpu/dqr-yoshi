@@ -111,12 +111,12 @@ const App: React.FC = () => {
 
   const handleGenerate = () => {
     if (!formData.codigo.trim()) {
-      showPopMessage("Ingresa el Ticket", 'info');
+      showPopMessage("Ingresa el Ticket", "info");
       return;
     }
     formatSaldoOnComplete();
     setShowPreview(true);
-    showPopMessage("Ticket generado", 'success');
+    showPopMessage("Ticket generado", "success");
   };
 
   const handleClear = () => {
@@ -222,14 +222,14 @@ const App: React.FC = () => {
     <div className="max-w-md mx-auto min-h-screen bg-gray-50 pb-24 px-4 overflow-y-auto relative">
       {/* Texto de versión en el top absoluto */}
       <div className="text-center pt-6">
-        <span className="text-[10px] text-gray-400 font-medium tracking-tight">V 2.0 Developed JV®</span>
+        <span className="text-[10px] text-gray-400 font-medium tracking-tight">V 2.1 Developed JV®</span>
       </div>
 
       {/* Banner de Instalación */}
       {showInstallBanner && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[150] w-[90%] max-w-sm animate-in slide-in-from-bottom-6 duration-500">
-          <div className="bg-white p-5 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-[#bd004d]/10 flex items-center gap-4">
-            <div className="bg-[#bd004d]/5 p-3 rounded-2xl">
+          <div className="bg-white p-5 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-[#d6045b]/10 flex items-center gap-4">
+            <div className="bg-[#d6045b]/5 p-3 rounded-2xl">
               <YoshiLogo className="w-8 h-8" />
             </div>
             <div className="flex-1">
@@ -240,7 +240,7 @@ const App: React.FC = () => {
               <button onClick={() => setShowInstallBanner(false)} className="px-3 py-2 text-[10px] font-bold text-gray-400">Ahora no</button>
               <button 
                 onClick={handleInstallClick}
-                className="bg-[#bd004d] text-white px-5 py-2.5 rounded-xl text-[10px] font-bold shadow-lg shadow-[#bd004d]/20 active:scale-95 transition-transform"
+                className="bg-[#d6045b] text-white px-5 py-2.5 rounded-xl text-[10px] font-bold shadow-lg shadow-[#d6045b]/20 active:scale-95 transition-transform"
               >
                 {isIOS ? '¿Cómo?' : 'Instalar'}
               </button>
@@ -253,7 +253,7 @@ const App: React.FC = () => {
         <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] w-[90%] max-w-sm pointer-events-none animate-in fade-in slide-in-from-top-4 duration-300">
           <div className={`px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border backdrop-blur-md ${
             toast.type === 'error' ? 'bg-red-500/90 border-red-400 text-white' : 
-            toast.type === 'success' ? 'bg-[#bd004d]/90 border-[#bd004d]/30 text-white' : 
+            toast.type === 'success' ? 'bg-[#d6045b]/90 border-[#d6045b]/30 text-white' : 
             'bg-gray-900/90 border-gray-700 text-white'
           }`}>
             <div className="flex-1 text-xs font-bold tracking-tight leading-relaxed">{toast.message}</div>
@@ -284,7 +284,7 @@ const App: React.FC = () => {
         <h1 className="text-2xl font-extrabold text-gray-900 font-title tracking-tight">Yoshi Cash</h1>
         <div className="flex items-center gap-2 mt-1">
           <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-          <p className="text-[#bd004d] font-black uppercase tracking-widest text-[10px]">Digitalizador de QR</p>
+          <p className="text-[#d6045b] font-black uppercase tracking-widest text-[10px]">Digitalizador de QR</p>
         </div>
       </header>
 
@@ -298,7 +298,7 @@ const App: React.FC = () => {
                 <input 
                   type="text" name="saldo" value={formData.saldo} 
                   onChange={handleInputChange} onBlur={formatSaldoOnComplete} inputMode="decimal"
-                  className="w-full pl-10 pr-5 py-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[#bd004d]/10 font-bold text-gray-700 transition-all placeholder:font-normal" 
+                  className="w-full pl-10 pr-5 py-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[#d6045b]/10 font-bold text-gray-700 transition-all placeholder:font-normal" 
                   placeholder="0.00" 
                 />
               </div>
@@ -309,12 +309,12 @@ const App: React.FC = () => {
               <div className="relative flex items-center">
                 <input 
                   type="text" name="codigo" value={formData.codigo} onChange={handleInputChange} 
-                  className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[#bd004d]/10 font-bold text-gray-700 transition-all pr-14 placeholder:font-normal" 
+                  className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[#d6045b]/10 font-bold text-gray-700 transition-all pr-14 placeholder:font-normal" 
                   placeholder="Ej: tick-a1b2..." 
                 />
                 <button 
                   onClick={() => openScanner('codigo')}
-                  className="absolute right-2 p-2.5 text-[#bd004d] hover:bg-[#bd004d]/5 rounded-xl transition-colors"
+                  className="absolute right-2 p-2.5 text-[#d6045b] hover:bg-[#d6045b]/5 rounded-xl transition-colors"
                   title="Escanear Ticket"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -327,7 +327,7 @@ const App: React.FC = () => {
             <div className="flex gap-4">
               <button 
                 onClick={handleGenerate}
-                className="flex-1 bg-[#bd004d] text-white py-4 rounded-2xl font-bold shadow-lg shadow-[#bd004d]/20 active:scale-95 transition-transform uppercase flex items-center justify-center gap-2 text-xs tracking-widest"
+                className="flex-1 bg-[#d6045b] text-white py-4 rounded-2xl font-bold shadow-lg shadow-[#d6045b]/20 active:scale-95 transition-transform uppercase flex items-center justify-center gap-2 text-xs tracking-widest"
               >
                 GENERAR TICKET
               </button>
@@ -353,7 +353,7 @@ const App: React.FC = () => {
                 <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block mb-2 tracking-widest">WhatsApp de Envío</label>
                 <input 
                   type="tel" name="phone" value={formData.phone} onChange={handleInputChange}
-                  className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none font-bold text-gray-700 focus:ring-2 focus:ring-[#bd004d]/10 transition-all placeholder:font-normal" 
+                  className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none font-bold text-gray-700 focus:ring-2 focus:ring-[#d6045b]/10 transition-all placeholder:font-normal" 
                   placeholder="521..." 
                 />
               </div>
@@ -362,7 +362,7 @@ const App: React.FC = () => {
                 <button 
                   onClick={handleSend}
                   disabled={isProcessing}
-                  className="bg-[#bd004d] text-white font-black rounded-2xl h-16 shadow-lg active:scale-95 transition-all text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 disabled:opacity-50"
+                  className="bg-[#d6045b] text-white font-black rounded-2xl h-16 shadow-lg active:scale-95 transition-all text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 disabled:opacity-50"
                 >
                   {isProcessing ? (
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -378,7 +378,7 @@ const App: React.FC = () => {
                 <button 
                   onClick={() => processAndShareTicket(true)}
                   disabled={isProcessing}
-                  className="bg-[#bd004d] text-white font-black rounded-2xl h-16 shadow-lg active:scale-95 transition-all text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 disabled:opacity-50"
+                  className="bg-[#d6045b] text-white font-black rounded-2xl h-16 shadow-lg active:scale-95 transition-all text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 disabled:opacity-50"
                 >
                    {isProcessing ? (
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>

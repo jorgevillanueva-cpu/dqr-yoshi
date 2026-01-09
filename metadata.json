@@ -1,6 +1,7 @@
-
 {
   "requestFramePermissions": [
     "camera"
-  ]
+  ],
+  "name": "Digitalizador QR",
+  "description": ""
 }

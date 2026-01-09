@@ -9,14 +9,17 @@ interface TicketPreviewProps {
   innerRef: React.RefObject<HTMLDivElement>;
 }
 
-// Logo SVG restaurado a la versión original de tres trazos
+// Logo SVG updated with the new branding provided
 export const YoshiLogo: React.FC<{ className?: string; color?: string }> = ({ className, color = COLORS.PRIMARY }) => (
-  <svg className={className} viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
-    <g fill="none" stroke={color} strokeWidth="38" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M 125 80 L 125 375 C 125 375 125 420 170 420 L 245 420 L 245 350" />
-      <path d="M 245 350 C 245 350 245 420 310 420 C 375 420 425 375 425 250 C 425 125 350 80 250 80 L 125 80" />
-      <path d="M 250 80 C 250 80 180 80 180 220 C 180 350 300 370 300 330" />
-      <circle cx="335" cy="235" r="22" fill={color} stroke="none" />
+  <svg 
+    className={className} 
+    viewBox="0 0 288 337" 
+    xmlns="http://www.w3.org/2000/svg"
+    preserveAspectRatio="xMidYMid meet"
+  >
+    <g transform="translate(0.000000,337.000000) scale(0.100000,-0.100000)" fill={color} stroke="none">
+      <path d="M610 3210 c0 -41 -4 -60 -12 -60 -7 -1 -140 0 -296 0 l-282 1 3 -758 c2 -417 6 -776 10 -798 16 -88 62 -211 109 -288 61 -102 246 -287 286 -287 6 0 12 -3 14 -8 4 -10 134 -67 183 -80 22 -6 59 -15 81 -21 26 -7 169 -11 378 -11 l336 0 0 221 0 221 33 -7 c17 -4 42 -11 55 -16 l22 -9 0 -333 0 -334 178 0 c294 -1 380 10 500 64 29 12 55 23 58 23 3 0 26 14 52 32 140 96 239 233 286 398 26 91 36 266 36 630 0 386 -11 518 -56 675 -40 136 -129 302 -219 404 -62 72 -138 142 -199 185 -61 44 -231 137 -271 148 -217 61 -291 67 -862 68 l-423 0 0 -60z m1060 -257 c291 -70 496 -247 611 -528 41 -102 58 -335 59 -820 0 -342 -22 -434 -132 -544 -77 -77 -211 -126 -323 -119 l-50 3 -3 161 c-3 184 -7 175 87 167 64 -5 154 11 186 34 54 40 73 141 36 197 -39 59 -62 66 -215 66 -159 0 -339 26 -421 60 -223 94 -363 203 -474 370 -137 207 -171 353 -171 740 l0 230 383 -3 c224 -2 401 -8 427 -14z m-1109 -323 c8 -268 22 -363 76 -520 80 -234 215 -413 446 -594 l37 -28 0 -144 0 -144 -171 0 c-186 0 -240 9 -338 58 -76 38 -188 151 -229 232 -60 119 -62 144 -62 776 0 314 3 574 7 578 4 3 57 5 117 4 l111 -3 6 -215z"/>
+      <path d="M1905 2163 c-90 -47 -118 -157 -62 -242 88 -133 298 -69 301 93 3 120 -133 205 -239 149z"/>
     </g>
   </svg>
 );
@@ -34,8 +37,8 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
       {/* Cabecera con Logo */}
       <div className="relative h-[11%] w-full bg-white flex flex-col items-center justify-center border-b-2 border-dashed border-gray-100">
         <div className="flex flex-col items-center">
-          <YoshiLogo className="h-20 w-20" />
-          <h2 className="text-[20px] font-extrabold text-gray-900 font-title -mt-2 tracking-tight">
+          <YoshiLogo className="h-16 w-16" />
+          <h2 className="text-[20px] font-extrabold text-gray-900 font-title -mt-1 tracking-tight">
             Yoshi Cash
           </h2>
         </div>
@@ -93,7 +96,7 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
 
         <p className="text-[18px] font-medium text-gray-400 text-center mt-10 max-w-[95%] leading-tight tracking-tight">
           Solicita tu saldo remanente desde<br/>
-          <span className="text-[16px] text-[#bd004d] font-bold lowercase tracking-wider">https://yoshicash.com/refunds</span>
+          <span className="text-[16px] text-[#d6045b] font-bold lowercase tracking-wider">https://yoshicash.com/refunds</span>
         </p>
       </div>
 
