@@ -3,5 +3,16 @@ export interface TicketData {
   saldo: string;
   codigo: string;
   phone: string;
-  logoUrl?: string;
+  valido?: string;
+  cortesia?: boolean;
+  showExtraData?: boolean;
+  extraData?: string;
+}
+
+export interface PromoData {
+  tipo: string;
+  producto?: string;
+  promo: string;
+  phone: string;
+  index: number;
 }
