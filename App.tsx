@@ -228,38 +228,38 @@ const App: React.FC = () => {
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-gray-50 pb-40 px-4 overflow-y-auto relative">
-      {/* Banner de Instalación PWA */}
+      {/* Banner de Instalación PWA - Rediseñado como POP en la parte superior izquierda */}
       {showInstallBanner && (
-        <div className="fixed bottom-0 left-0 right-0 z-[150] p-4 animate-in slide-in-from-bottom duration-500">
-          <div className="bg-white rounded-[2rem] p-5 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] border border-gray-100 flex flex-col gap-4">
-            <div className="flex items-center gap-4">
-              <div className="bg-[#fa005a]/10 p-2.5 rounded-2xl">
-                <YoshiLogo className="w-8 h-8" />
+        <div className="fixed top-6 left-6 z-[250] w-[260px] animate-in slide-in-from-left duration-500">
+          <div className="bg-white rounded-3xl p-4 shadow-[0_15px_40px_rgba(0,0,0,0.15)] border border-gray-100 flex flex-col gap-3">
+            <div className="flex items-start gap-3">
+              <div className="bg-[#fa005a]/10 p-2 rounded-xl shrink-0">
+                <YoshiLogo className="w-6 h-6" />
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-black text-gray-900 leading-tight">Instalar Yoshi Cash</h3>
-                <p className="text-[10px] text-gray-500 font-medium leading-tight">Acceso rápido y offline desde tu pantalla de inicio.</p>
+                <h3 className="text-[11px] font-black text-gray-900 leading-tight uppercase tracking-wider">Instalar Yoshi Cash</h3>
+                <p className="text-[9px] text-gray-500 font-medium leading-tight mt-1">Acceso rápido desde tu pantalla de inicio.</p>
               </div>
               <button 
                 onClick={() => setShowInstallBanner(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-gray-300 hover:text-gray-500 transition-colors"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             
             {isIOS ? (
-              <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-center gap-2">
-                <span className="text-[10px] font-bold text-gray-600 text-center">
-                  Toca <svg className="w-4 h-4 inline mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg> y luego <span className="text-[#fa005a]">"Añadir a pantalla de inicio"</span>
+              <div className="bg-gray-50 rounded-xl p-2.5 flex items-center justify-center">
+                <span className="text-[9px] font-bold text-gray-600 text-center leading-normal">
+                  Toca <svg className="w-3.5 h-3.5 inline mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg> y <span className="text-[#fa005a]">"Añadir a pantalla"</span>
                 </span>
               </div>
             ) : (
               <button 
                 onClick={handleInstallClick}
-                className="w-full bg-[#fa005a] text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-[#fa005a]/20 active:scale-[0.98] transition-all"
+                className="w-full bg-[#fa005a] text-white py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-[#fa005a]/20 active:scale-[0.98] transition-all"
               >
-                Instalar Ahora
+                Instalar App
               </button>
             )}
           </div>
