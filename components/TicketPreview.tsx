@@ -30,7 +30,7 @@ const FullLogo: React.FC<{ className?: string }> = ({ className }) => (
     preserveAspectRatio="xMidYMid meet"
   >
     <g transform="translate(0.000000,218.000000) scale(0.100000,-0.100000)" stroke="none">
-      <g fill="#d7035a">
+      <g fill={COLORS.PRIMARY}>
         <path d="M450 1906 l0 -36 -160 0 -161 0 3 -437 c3 -427 4 -439 25 -493 51 -124 150 -223 271 -271 51 -21 77 -24 260 -27 l202 -3 0 120 c0 109 2 121 18 121 43 -1 45 -9 43 -200 l-2 -182 153 4 c184 5 238 22 322 99 117 107 136 176 136 504 0 247 -8 333 -40 422 -63 180 -222 330 -409 386 -58 18 -104 21 -363 24 l-298 5 0 -36z m595 -150 c168 -45 300 -180 334 -344 15 -72 15 -542 0 -593 -26 -87 -113 -149 -207 -149 l-52 0 0 90 0 90 65 0 c57 0 69 3 90 25 33 32 33 78 0 110 -22 23 -32 25 -112 25 -176 1 -294 43 -403 146 -79 75 -134 170 -155 271 -9 40 -15 125 -15 206 l0 137 203 0 c137 0 218 -5 252 -14z m-613 -213 c5 -136 9 -168 31 -230 43 -125 119 -234 213 -306 l54 -42 0 -84 0 -84 -106 6 c-118 8 -168 24 -227 77 -95 83 -106 142 -107 543 l0 277 69 0 69 0 4 -157z"/>
         <path d="M1135 1315 c-34 -33 -34 -92 0 -129 68 -73 191 18 143 107 -18 34 -39 46 -81 47 -27 0 -45 -7 -62 -25z"/>
       </g>
@@ -96,7 +96,7 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
             
             {/* Se aplica transform -translate-y-[6px] para subir los textos */}
             <div className="relative z-10 flex flex-col items-center justify-center transform -translate-y-[6px]">
-              <span className="text-[9px] font-bold uppercase tracking-[0.2em] opacity-80 leading-none">
+              <span className="text-[9px] font-bold uppercase tracking-[0.2em] opacity-80 leading-none mb-1">
                 Saldo Disponible
               </span>
               <span className="text-[34px] font-normal tracking-tighter leading-none">
