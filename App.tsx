@@ -149,6 +149,27 @@ const App: React.FC = () => {
     showPopMessage("Campos limpiados");
   };
 
+  const handleCopyToClipboard = async () => {
+    const el = ticketRef.current;
+    if (!el) return;
+
+    setIsProcessing(true);
+    try {
+      const canvas = await html2canvas(el, { scale: 3, useCORS: true });
+      const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
+      if (blob && navigator.clipboard) {
+        await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+        showPopMessage("¡Copiado al portapapeles!", "success");
+      } else {
+        showPopMessage("Tu navegador no soporta copiar imágenes", "error");
+      }
+    } catch (e) {
+      showPopMessage("Error al copiar imagen", "error");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleSendSingle = async () => {
     const el = ticketRef.current;
     const phone = formData.phone;
@@ -395,7 +416,7 @@ const App: React.FC = () => {
       </div>
 
       {showPreview && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-[400px] z-50 animate-in slide-in-from-bottom-10 duration-700 ease-out">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-[440px] z-50 animate-in slide-in-from-bottom-10 duration-700 ease-out">
           <div className="bg-white/80 backdrop-blur-2xl rounded-[2.5rem] p-4 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] border border-white/40 space-y-3">
             <div className="relative group">
               <input 
@@ -411,29 +432,41 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               <button 
                 onClick={handleSendSingle} 
                 disabled={isProcessing}
-                className="bg-[#d6045b] text-white font-black rounded-2xl h-14 shadow-lg active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-3 overflow-hidden group relative"
+                className="bg-[#d6045b] text-white font-black rounded-2xl h-14 shadow-lg active:scale-95 transition-all disabled:opacity-50 flex flex-col items-center justify-center gap-1 overflow-hidden group relative"
               >
                 <div className="absolute inset-0 bg-white/10 translate-y-full group-active:translate-y-0 transition-transform duration-300"></div>
                 <svg className="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
-                <span className="text-[10px] uppercase tracking-[0.2em] relative z-10">Enviar a WA</span>
+                <span className="text-[8px] uppercase tracking-[0.1em] relative z-10">WhatsApp</span>
+              </button>
+
+              <button 
+                onClick={handleCopyToClipboard} 
+                disabled={isProcessing}
+                className="bg-gray-100 text-gray-800 font-black rounded-2xl h-14 shadow-lg active:scale-95 transition-all disabled:opacity-50 flex flex-col items-center justify-center gap-1 overflow-hidden group relative border border-gray-200"
+              >
+                <div className="absolute inset-0 bg-gray-200 translate-y-full group-active:translate-y-0 transition-transform duration-300"></div>
+                <svg className="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <span className="text-[8px] uppercase tracking-[0.1em] relative z-10">Copiar</span>
               </button>
               
               <button 
                 onClick={handleShare} 
                 disabled={isProcessing}
-                className="bg-gray-900 text-white font-black rounded-2xl h-14 shadow-lg active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-3 overflow-hidden group relative"
+                className="bg-gray-900 text-white font-black rounded-2xl h-14 shadow-lg active:scale-95 transition-all disabled:opacity-50 flex flex-col items-center justify-center gap-1 overflow-hidden group relative"
               >
                 <div className="absolute inset-0 bg-white/10 translate-y-full group-active:translate-y-0 transition-transform duration-300"></div>
                 <svg className="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                 </svg>
-                <span className="text-[10px] uppercase tracking-[0.2em] relative z-10">Compartir</span>
+                <span className="text-[8px] uppercase tracking-[0.1em] relative z-10">Compartir</span>
               </button>
             </div>
           </div>

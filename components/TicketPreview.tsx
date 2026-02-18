@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { TicketData } from '../types';
@@ -9,6 +8,20 @@ interface TicketPreviewProps {
   innerRef: React.RefObject<HTMLDivElement>;
 }
 
+// Added YoshiLogo component and exported it to resolve errors in App.tsx and PromoPreview.tsx
+export const YoshiLogo: React.FC<{ className?: string; color?: string }> = ({ className, color = COLORS.PRIMARY }) => (
+  <svg 
+    className={className} 
+    viewBox="0 0 288 337" 
+    xmlns="http://www.w3.org/2000/svg" 
+    preserveAspectRatio="xMidYMid meet"
+  >
+    <g transform="translate(0.000000,337.000000) scale(0.100000,-0.100000)" fill={color} stroke="none">
+      <path d="M610 3210 c0 -41 -4 -60 -12 -60 -7 -1 -140 0 -296 0 l-282 1 3 -758 c2 -417 6 -776 10 -798 16 -88 62 -211 109 -288 61 -102 246 -287 286 -287 6 0 12 -3 14 -8 4 -10 134 -67 183 -80 22 -6 59 -15 81 -21 26 -7 169 -11 378 -11 l336 0 0 221 0 221 33 -7 c17 -4 42 -11 55 -16 l22 -9 0 -333 0 -334 178 0 c294 -1 380 10 500 64 29 12 55 23 58 23 3 0 26 14 52 32 140 96 239 233 286 398 26 91 36 266 36 630 0 386 -11 518 -56 675 -40 136 -129 302 -219 404 -62 72 -138 142 -199 185 -61 44 -231 137 -271 148 -217 61 -291 67 -862 68 l-423 0 0 -60zM1670 2953 c291 -70 496 -247 611 -528 41 -102 58 -335 59 -820 0 -342 -22 -434 -132 -544 -77 -77 -211 -126 -323 -119 l-50 3 -3 161 c-3 184 -7 175 87 167 64 -5 154 11 186 34 54 40 73 141 36 197 -39 59 -62 66 -215 66 -159 0 -339 26 -421 60 -223 94 -363 203 -474 370 -137 207 -171 353 -171 740 l0 230 383 -3 c224 -2 401 -8 427 -14zM561 2630 c8 -268 22 -363 76 -520 80 -234 215 -413 446 -594 l37 -28 0 -144 0 -144 -171 0 c-186 0 -240 9 -338 58 -76 38 -188 151 -229 232 -60 119 -62 144 -62 776 0 314 3 574 7 578 4 3 57 5 117 4 l111 -3 6 -215zM1905 2163 c-90 -47 -118 -157 -62 -242 88 -133 298 -69 301 93 3 120 -133 205 -239 149z" />
+    </g>
+  </svg>
+);
+
 const FullLogo: React.FC<{ className?: string }> = ({ className }) => (
   <svg 
     className={className}
@@ -16,7 +29,7 @@ const FullLogo: React.FC<{ className?: string }> = ({ className }) => (
     xmlns="http://www.w3.org/2000/svg"
     preserveAspectRatio="xMidYMid meet"
   >
-    <g transform="translate(0.000000,218.000000) scale(0.100000,-0.100000)">
+    <g transform="translate(0.000000,218.000000) scale(0.100000,-0.100000)" stroke="none">
       <g fill="#d7035a">
         <path d="M450 1906 l0 -36 -160 0 -161 0 3 -437 c3 -427 4 -439 25 -493 51 -124 150 -223 271 -271 51 -21 77 -24 260 -27 l202 -3 0 120 c0 109 2 121 18 121 43 -1 45 -9 43 -200 l-2 -182 153 4 c184 5 238 22 322 99 117 107 136 176 136 504 0 247 -8 333 -40 422 -63 180 -222 330 -409 386 -58 18 -104 21 -363 24 l-298 5 0 -36z m595 -150 c168 -45 300 -180 334 -344 15 -72 15 -542 0 -593 -26 -87 -113 -149 -207 -149 l-52 0 0 90 0 90 65 0 c57 0 69 3 90 25 33 32 33 78 0 110 -22 23 -32 25 -112 25 -176 1 -294 43 -403 146 -79 75 -134 170 -155 271 -9 40 -15 125 -15 206 l0 137 203 0 c137 0 218 -5 252 -14z m-613 -213 c5 -136 9 -168 31 -230 43 -125 119 -234 213 -306 l54 -42 0 -84 0 -84 -106 6 c-118 8 -168 24 -227 77 -95 83 -106 142 -107 543 l0 277 69 0 69 0 4 -157z"/>
         <path d="M1135 1315 c-34 -33 -34 -92 0 -129 68 -73 191 18 143 107 -18 34 -39 46 -81 47 -27 0 -45 -7 -62 -25z"/>
@@ -37,20 +50,6 @@ const FullLogo: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
-export const YoshiLogo: React.FC<{ className?: string; color?: string }> = ({ className, color = COLORS.PRIMARY }) => (
-  <svg 
-    className={className} 
-    viewBox="0 0 288 337" 
-    xmlns="http://www.w3.org/2000/svg"
-    preserveAspectRatio="xMidYMid meet"
-  >
-    <g transform="translate(0.000000,337.000000) scale(0.100000,-0.100000)" fill={color} stroke="none">
-      <path d="M610 3210 c0 -41 -4 -60 -12 -60 -7 -1 -140 0 -296 0 l-282 1 3 -758 c2 -417 6 -776 10 -798 16 -88 62 -211 109 -288 61 -102 246 -287 286 -287 6 0 12 -3 14 -8 4 -10 134 -67 183 -80 22 -6 59 -15 81 -21 26 -7 169 -11 378 -11 l336 0 0 221 0 221 33 -7 c17 -4 42 -11 55 -16 l22 -9 0 -333 0 -334 178 0 c294 -1 380 10 500 64 29 12 55 23 58 23 3 0 26 14 52 32 140 96 239 233 286 398 26 91 36 266 36 630 0 386 -11 518 -56 675 -40 136 -129 302 -219 404 -62 72 -138 142 -199 185 -61 44 -231 137 -271 148 -217 61 -291 67 -862 68 l-423 0 0 -60z m1060 -257 c291 -70 496 -247 611 -528 41 -102 58 -335 59 -820 0 -342 -22 -434 -132 -544 -77 -77 -211 -126 -323 -119 l-50 3 -3 161 c-3 184 -7 175 87 167 64 -5 154 11 186 34 54 40 73 141 36 197 -39 59 -62 66 -215 66 -159 0 -339 26 -421 60 -223 94 -363 203 -474 370 -137 207 -171 353 -171 740 l0 230 383 -3 c224 -2 401 -8 427 -14z m-1109 -323 c8 -268 22 -363 76 -520 80 -234 215 -413 446 -594 l37 -28 0 -144 0 -144 -171 0 c-186 0 -240 9 -338 58 -76 38 -188 151 -229 232 -60 119 -62 144 -62 776 0 314 3 574 7 578 4 3 57 5 117 4 l111 -3 6 -215z"/>
-      <path d="M1905 2163 c-90 -47 -118 -157 -62 -242 88 -133 298 -69 301 93 3 120 -133 205 -239 149z"/>
-    </g>
-  </svg>
-);
-
 export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) => {
   return (
     <div 
@@ -61,11 +60,13 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
         backgroundColor: '#F9FAFB' 
       }}
     >
-      {/* Cabecera compactada */}
-      <div className="relative h-[18%] w-full bg-white flex flex-col items-center justify-start border-b border-dashed border-gray-200 px-10 pt-8">
+      {/* Cabecera optimizada: h-[15%] y pt-1 */}
+      <div className="relative h-[15%] w-full bg-white flex flex-col items-center justify-start border-b border-dashed border-gray-200 px-10 pt-1">
+        {/* Logo subido */}
         <FullLogo className="w-full h-auto max-h-[3.2rem]" />
         
-        <div className="flex flex-col items-center mt-3 space-y-1">
+        {/* Espaciado mínimo: mt-0 */}
+        <div className="flex flex-col items-center mt-0 space-y-0.5">
           {data.cortesia && (
             <span className="text-[20px] font-normal text-[#d6045b] uppercase tracking-[0.2em] animate-in zoom-in-95 duration-500 leading-none">
               Cortesía
@@ -80,9 +81,9 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
         </div>
       </div>
 
-      {/* Sección de Saldo reducida */}
+      {/* Sección de Saldo bajada ligeramente: mt-[-2px] */}
       {data.saldo && data.saldo.trim() !== '' && (
-        <div className="relative px-8 pt-2 pb-0">
+        <div className="relative px-8 pt-0 pb-0 mt-[-2px] z-20">
           <div 
             className="w-full h-16 rounded-[1.2rem] shadow-md flex flex-col items-center justify-center text-white overflow-hidden relative"
             style={{ backgroundColor: COLORS.PRIMARY }}
@@ -93,11 +94,12 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
               ))}
             </div>
             
-            <div className="relative z-10 flex flex-col items-center justify-center">
-              <span className="text-[7px] font-bold uppercase tracking-[0.2em] opacity-80 -mb-0.5 transform -translate-y-[1px]">
+            {/* Se aplica transform -translate-y-[6px] para subir los textos */}
+            <div className="relative z-10 flex flex-col items-center justify-center transform -translate-y-[6px]">
+              <span className="text-[9px] font-bold uppercase tracking-[0.2em] opacity-80 leading-none">
                 Saldo Disponible
               </span>
-              <span className="text-[34px] font-normal tracking-tighter leading-none py-1">
+              <span className="text-[34px] font-normal tracking-tighter leading-none">
                 ${data.saldo}
               </span>
             </div>
@@ -110,7 +112,7 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
         <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-gray-50 border border-gray-100 shadow-inner"></div>
         <div className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-gray-50 border border-gray-100 shadow-inner"></div>
 
-        <p className="text-[18px] font-medium text-gray-400 text-center mb-3 max-w-[85%] leading-tight tracking-tight">
+        <p className="text-[18px] font-medium text-gray-400 text-center mb-3 max-w-[85%] leading-tight tracking-tight mt-0">
           Presenta este código QR para pagar en el recinto
         </p>
 
@@ -137,7 +139,6 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
           </div>
         )}
 
-        {/* Pie de página compacto y elevado (pb-4 para recortar abajo, pt-1 para subir el texto) */}
         <div className="mt-auto pt-1 pb-4 w-full border-t border-dashed border-gray-200/30">
           <p className="text-[19px] font-medium text-gray-400 text-center leading-snug tracking-tight">
             Solicita tu saldo remanente desde<br/>
