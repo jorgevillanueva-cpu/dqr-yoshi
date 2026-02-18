@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { TicketData } from '../types';
@@ -12,12 +13,13 @@ interface TicketPreviewProps {
 export const YoshiLogo: React.FC<{ className?: string; color?: string }> = ({ className, color = COLORS.PRIMARY }) => (
   <svg 
     className={className} 
-    viewBox="0 0 288 337" 
+    viewBox="0 0 600 600" 
     xmlns="http://www.w3.org/2000/svg" 
     preserveAspectRatio="xMidYMid meet"
   >
-    <g transform="translate(0.000000,337.000000) scale(0.100000,-0.100000)" fill={color} stroke="none">
-      <path d="M610 3210 c0 -41 -4 -60 -12 -60 -7 -1 -140 0 -296 0 l-282 1 3 -758 c2 -417 6 -776 10 -798 16 -88 62 -211 109 -288 61 -102 246 -287 286 -287 6 0 12 -3 14 -8 4 -10 134 -67 183 -80 22 -6 59 -15 81 -21 26 -7 169 -11 378 -11 l336 0 0 221 0 221 33 -7 c17 -4 42 -11 55 -16 l22 -9 0 -333 0 -334 178 0 c294 -1 380 10 500 64 29 12 55 23 58 23 3 0 26 14 52 32 140 96 239 233 286 398 26 91 36 266 36 630 0 386 -11 518 -56 675 -40 136 -129 302 -219 404 -62 72 -138 142 -199 185 -61 44 -231 137 -271 148 -217 61 -291 67 -862 68 l-423 0 0 -60zM1670 2953 c291 -70 496 -247 611 -528 41 -102 58 -335 59 -820 0 -342 -22 -434 -132 -544 -77 -77 -211 -126 -323 -119 l-50 3 -3 161 c-3 184 -7 175 87 167 64 -5 154 11 186 34 54 40 73 141 36 197 -39 59 -62 66 -215 66 -159 0 -339 26 -421 60 -223 94 -363 203 -474 370 -137 207 -171 353 -171 740 l0 230 383 -3 c224 -2 401 -8 427 -14zM561 2630 c8 -268 22 -363 76 -520 80 -234 215 -413 446 -594 l37 -28 0 -144 0 -144 -171 0 c-186 0 -240 9 -338 58 -76 38 -188 151 -229 232 -60 119 -62 144 -62 776 0 314 3 574 7 578 4 3 57 5 117 4 l111 -3 6 -215zM1905 2163 c-90 -47 -118 -157 -62 -242 88 -133 298 -69 301 93 3 120 -133 205 -239 149z" />
+    <g transform="translate(0.000000,600.000000) scale(0.100000,-0.100000)" fill={color} stroke="none">
+      <path d="M1600 5426 l0 -126 -564 -2 -563 -3 -5 -1160 c-6 -1711 -3 -1796 77 -2050 78 -251 203 -454 405 -656 291 -291 619 -446 1018 -479 64 -5 363 -10 665 -10 l547 0 1 418 c1 229 1 423 0 429 -3 19 22 16 121 -14 l88 -26 0 -649 0 -648 388 0 c213 0 430 5 482 10 360 38 629 160 866 395 119 118 197 226 264 368 79 165 122 319 134 487 9 116 13 1197 5 1560 -7 350 -16 433 -69 639 -133 524 -468 986 -931 1287 -197 128 -498 254 -709 298 -228 47 -256 48 -1262 53 l-958 5 0 -126z m1870 -477 c286 -26 534 -114 775 -274 120 -80 330 -289 414 -413 122 -180 203 -373 253 -602 l23 -105 0 -940 0 -940 -29 -85 c-83 -248 -254 -421 -497 -503 -77 -27 -234 -47 -361 -47 l-68 0 0 310 c0 171 -1 313 -2 318 -2 4 96 9 217 12 206 5 223 6 265 28 58 30 95 66 128 121 35 59 43 179 17 248 -24 63 -94 136 -158 164 -50 22 -66 24 -377 30 -271 5 -343 10 -435 27 -403 78 -734 256 -1010 543 -104 108 -144 158 -216 271 -128 199 -230 458 -269 682 -11 66 -24 198 -30 295 -11 199 -14 854 -3 864 11 11 1238 8 1363 -4z m-1949 -599 c-2 -286 0 -384 14 -505 75 -662 384 -1216 911 -1636 45 -35 98 -77 118 -93 l38 -28 -4 -277 -3 -276 -210 -3 c-240 -4 -454 11 -562 38 -86 23 -218 82 -300 137 -139 92 -290 266 -364 420 -68 141 -88 239 -99 473 -11 226 -13 2093 -3 2104 4 3 110 5 237 4 l231 -3 -4 -355z" />
+      <path d="M4180 3426 c-96 -28 -161 -80 -206 -167 -26 -48 -29 -64 -29 -149 0 -84 3 -101 27 -145 133 -251 499 -231 598 33 61 159 -24 355 -178 412 -70 26 -155 33 -212 16z" />
     </g>
   </svg>
 );
@@ -26,12 +28,12 @@ const FullLogo: React.FC<{ className?: string }> = ({ className }) => (
   <svg 
     className={className}
     viewBox="0 0 600 218" 
-    xmlns="http://www.w3.org/2000/svg"
+    xmlns="http://www.w3.org/2000/svg" 
     preserveAspectRatio="xMidYMid meet"
   >
     <g transform="translate(0.000000,218.000000) scale(0.100000,-0.100000)" stroke="none">
       <g fill={COLORS.PRIMARY}>
-        <path d="M450 1906 l0 -36 -160 0 -161 0 3 -437 c3 -427 4 -439 25 -493 51 -124 150 -223 271 -271 51 -21 77 -24 260 -27 l202 -3 0 120 c0 109 2 121 18 121 43 -1 45 -9 43 -200 l-2 -182 153 4 c184 5 238 22 322 99 117 107 136 176 136 504 0 247 -8 333 -40 422 -63 180 -222 330 -409 386 -58 18 -104 21 -363 24 l-298 5 0 -36z m595 -150 c168 -45 300 -180 334 -344 15 -72 15 -542 0 -593 -26 -87 -113 -149 -207 -149 l-52 0 0 90 0 90 65 0 c57 0 69 3 90 25 33 32 33 78 0 110 -22 23 -32 25 -112 25 -176 1 -294 43 -403 146 -79 75 -134 170 -155 271 -9 40 -15 125 -15 206 l0 137 203 0 c137 0 218 -5 252 -14z m-613 -213 c5 -136 9 -168 31 -230 43 -125 119 -234 213 -306 l54 -42 0 -84 0 -84 -106 6 c-118 8 -168 24 -227 77 -95 83 -106 142 -107 543 l0 277 69 0 69 0 4 -157z"/>
+        <path d="M450 1906 l0 -36 -160 0 -161 0 3 -437 c3 -427 4 -439 25 -493 51 -124 150 -223 271 -271 51 -21 77 -24 260 -27 l202 -3 0 120 c0 109 2 121 18 121 43 -1 45 -9 43 -200 l-2 -182 153 4 c184 5 238 22 322 99 117 107 136 176 136 504 0 247 -8 333 -40 422 -63 180 -222 330 -409 386 -58 18 -104 21 -363 24 l-298 5 0 -36z m595 -150 c168 -45 300 -180 334 -344 15 -72 15 -542 0 -593 -26 -87 -113 -149 -207 -149 l-52 0 0 90 0 90 65 0 c57 0 69 3 90 25 33 32 33 78 0 110 -22 23 -32 25 -112 25 -176 1 -294 43 -403 146 -79 75 -134 170 -155 271 -9 40 -15 125 -11 206 l0 137 203 0 c137 0 218 -5 252 -14z m-613 -213 c5 -136 9 -168 31 -230 43 -125 119 -234 213 -306 l54 -42 0 -84 0 -84 -106 6 c-118 8 -168 24 -227 77 -95 83 -106 142 -107 543 l0 277 69 0 69 0 4 -157z"/>
         <path d="M1135 1315 c-34 -33 -34 -92 0 -129 68 -73 191 18 143 107 -18 34 -39 46 -81 47 -27 0 -45 -7 -62 -25z"/>
       </g>
       <g fill="#333333">
@@ -68,7 +70,7 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
         {/* Espaciado mínimo: mt-0 */}
         <div className="flex flex-col items-center mt-0 space-y-0.5">
           {data.cortesia && (
-            <span className="text-[20px] font-normal text-[#d6045b] uppercase tracking-[0.2em] animate-in zoom-in-95 duration-500 leading-none">
+            <span className="text-[20px] font-normal text-[#fa005a] uppercase tracking-[0.2em] animate-in zoom-in-95 duration-500 leading-none">
               Cortesía
             </span>
           )}
@@ -88,7 +90,7 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
             className="w-full h-16 rounded-[1.2rem] shadow-md flex flex-col items-center justify-center text-white overflow-hidden relative"
             style={{ backgroundColor: COLORS.PRIMARY }}
           >
-            <div className="absolute inset-0 opacity-10 flex flex-wrap gap-2 p-1 overflow-hidden rotate-12 scale-150">
+            <div className="absolute inset-0 opacity-10 flex flex-wrap gap-2 pa1 overflow-hidden rotate-12 scale-150">
               {Array.from({ length: 20 }).map((_, i) => (
                 <YoshiLogo key={i} className="h-4 w-4" color="#FFFFFF" />
               ))}
@@ -115,8 +117,7 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
         <p className="text-[18px] font-medium text-gray-400 text-center mb-3 max-w-[85%] leading-tight tracking-tight mt-0">
           Presenta este código QR para pagar en el recinto
         </p>
-
-        <div className="w-full aspect-square bg-white rounded-[2rem] shadow-lg border border-gray-100 p-4 flex items-center justify-center relative overflow-hidden">
+        <div className="w-full aspect-square bg-white rounded-[2rem] shadow-lg border border-gray-100 px-4 flex items-center justify-center relative overflow-hidden">
           <div className="absolute inset-0 opacity-[0.01] flex items-center justify-center rotate-12 scale-110">
              <YoshiLogo className="w-full" />
           </div>
@@ -134,7 +135,7 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
         {data.valido && data.valido.trim() !== '' && (
           <div className="mt-3 px-3 py-1.5 rounded-md bg-gray-100/20 border border-gray-100/50 backdrop-blur-sm">
             <p className="text-[14px] font-bold text-gray-700 text-center uppercase tracking-widest">
-              VÁLIDO EN RECINTO: <span className="text-[#d6045b]">{data.valido}</span>
+              VÁLIDO EN RECINTO: <span className="text-[#fa005a]">{data.valido}</span>
             </p>
           </div>
         )}
@@ -142,7 +143,7 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
         <div className="mt-auto pt-1 pb-4 w-full border-t border-dashed border-gray-200/30">
           <p className="text-[19px] font-medium text-gray-400 text-center leading-snug tracking-tight">
             Solicita tu saldo remanente desde<br/>
-            <span className="text-[18px] text-[#d6045b] font-normal lowercase tracking-widest block">
+            <span className="text-[18px] text-[#fa005a] font-normal lowercase tracking-widest block">
               yoshicash.com/refunds
             </span>
           </p>
