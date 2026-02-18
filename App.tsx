@@ -93,6 +93,15 @@ const App: React.FC = () => {
     
     if (type === 'checkbox') {
       processed = checked;
+      // Si se desmarca cortesía, deshabilitar y desmarcar personalizar automáticamente
+      if (name === 'cortesia' && !checked) {
+        setFormData(prev => ({ 
+          ...prev, 
+          cortesia: false, 
+          showExtraData: false 
+        }));
+        return;
+      }
     } else {
       if (name === 'saldo') {
         // Permitir solo números y un punto
@@ -224,7 +233,7 @@ const App: React.FC = () => {
         <div className="fixed bottom-0 left-0 right-0 z-[150] p-4 animate-in slide-in-from-bottom duration-500">
           <div className="bg-white rounded-[2rem] p-5 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] border border-gray-100 flex flex-col gap-4">
             <div className="flex items-center gap-4">
-              <div className="bg-[#d6045b]/10 p-2.5 rounded-2xl">
+              <div className="bg-[#fa005a]/10 p-2.5 rounded-2xl">
                 <YoshiLogo className="w-8 h-8" />
               </div>
               <div className="flex-1">
@@ -242,13 +251,13 @@ const App: React.FC = () => {
             {isIOS ? (
               <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-center gap-2">
                 <span className="text-[10px] font-bold text-gray-600 text-center">
-                  Toca <svg className="w-4 h-4 inline mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg> y luego <span className="text-[#d6045b]">"Añadir a pantalla de inicio"</span>
+                  Toca <svg className="w-4 h-4 inline mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg> y luego <span className="text-[#fa005a]">"Añadir a pantalla de inicio"</span>
                 </span>
               </div>
             ) : (
               <button 
                 onClick={handleInstallClick}
-                className="w-full bg-[#d6045b] text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-[#d6045b]/20 active:scale-[0.98] transition-all"
+                className="w-full bg-[#fa005a] text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-[#fa005a]/20 active:scale-[0.98] transition-all"
               >
                 Instalar Ahora
               </button>
@@ -263,7 +272,7 @@ const App: React.FC = () => {
 
       {toast && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[200] w-[90%] max-sm animate-in fade-in slide-in-from-top-4 duration-300">
-          <div className={`px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 border ${toast.type === 'error' ? 'bg-red-500 text-white border-red-400' : 'bg-[#d6045b] text-white border-[#d6045b]/30'}`}>
+          <div className={`px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 border ${toast.type === 'error' ? 'bg-red-500 text-white border-red-400' : 'bg-[#fa005a] text-white border-[#fa005a]/30'}`}>
             <div className="flex-1 text-[11px] font-bold tracking-tight">{toast.message}</div>
           </div>
         </div>
@@ -303,7 +312,7 @@ const App: React.FC = () => {
                 value={formData.saldo} 
                 onChange={handleInputChange} 
                 onBlur={formatSaldoOnComplete}
-                className="w-full pl-8 pr-4 py-3 bg-gray-50 border-none rounded-xl font-black text-gray-700 outline-none focus:ring-2 focus:ring-[#d6045b]/10 transition-all text-sm" 
+                className="w-full pl-8 pr-4 py-3 bg-gray-50 border-none rounded-xl font-black text-gray-700 outline-none focus:ring-2 focus:ring-[#fa005a]/10 transition-all text-sm" 
                 placeholder="0.00" 
                 inputMode="decimal"
               />
@@ -318,12 +327,12 @@ const App: React.FC = () => {
                 name="codigo" 
                 value={formData.codigo} 
                 onChange={handleInputChange} 
-                className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl font-black text-gray-700 outline-none focus:ring-2 focus:ring-[#d6045b]/10 transition-all pr-12 text-sm" 
+                className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl font-black text-gray-700 outline-none focus:ring-2 focus:ring-[#fa005a]/10 transition-all pr-12 text-sm" 
                 placeholder="tick-..." 
               />
               <button 
                 onClick={() => openScanner('codigo')} 
-                className="absolute right-2 p-2 text-[#d6045b] hover:bg-[#d6045b]/5 rounded-lg transition-colors"
+                className="absolute right-2 p-2 text-[#fa005a] hover:bg-[#fa005a]/5 rounded-lg transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812-1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -341,7 +350,7 @@ const App: React.FC = () => {
                 name="valido" 
                 value={formData.valido} 
                 onChange={handleInputChange} 
-                className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl font-black text-gray-700 outline-none focus:ring-2 focus:ring-[#d6045b]/10 transition-all text-sm" 
+                className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl font-black text-gray-700 outline-none focus:ring-2 focus:ring-[#fa005a]/10 transition-all text-sm" 
                 placeholder="Ej. Auditorio Nacional" 
               />
             </div>
@@ -355,7 +364,7 @@ const App: React.FC = () => {
                 name="cortesia" 
                 checked={formData.cortesia} 
                 onChange={handleInputChange} 
-                className="w-5 h-5 rounded-md accent-[#d6045b] cursor-pointer"
+                className="w-5 h-5 rounded-md accent-[#fa005a] cursor-pointer"
               />
               <label htmlFor="cortesia" className="text-[9px] font-black text-gray-600 uppercase tracking-widest cursor-pointer select-none">
                 Cortesía
@@ -369,22 +378,26 @@ const App: React.FC = () => {
                 name="showExtraData" 
                 checked={formData.showExtraData} 
                 onChange={handleInputChange} 
-                className="w-5 h-5 rounded-md accent-[#d6045b] cursor-pointer"
+                disabled={!formData.cortesia}
+                className={`w-5 h-5 rounded-md accent-[#fa005a] ${formData.cortesia ? 'cursor-pointer' : 'cursor-not-allowed opacity-30'}`}
               />
-              <label htmlFor="showExtraData" className="text-[9px] font-black text-gray-600 uppercase tracking-widest cursor-pointer select-none">
+              <label 
+                htmlFor="showExtraData" 
+                className={`text-[9px] font-black uppercase tracking-widest select-none transition-opacity ${formData.cortesia ? 'text-gray-600 cursor-pointer' : 'text-gray-300 cursor-not-allowed opacity-50'}`}
+              >
                 Personalizar
               </label>
             </div>
           </div>
 
-          {formData.showExtraData && (
+          {formData.showExtraData && formData.cortesia && (
             <div className="animate-in slide-in-from-top-2 duration-300">
               <input 
                 type="text" 
                 name="extraData" 
                 value={formData.extraData} 
                 onChange={handleInputChange} 
-                className="w-full px-4 py-2 bg-gray-50 border-b-2 border-[#d6045b]/20 rounded-lg font-bold text-gray-700 outline-none focus:border-[#d6045b] transition-all text-xs text-center" 
+                className="w-full px-4 py-2 bg-gray-50 border-b-2 border-[#fa005a]/20 rounded-lg font-bold text-gray-700 outline-none focus:border-[#fa005a] transition-all text-xs text-center" 
                 placeholder="Nombre o característica extra..." 
               />
             </div>
@@ -393,7 +406,7 @@ const App: React.FC = () => {
           <div className="flex gap-3 pt-1">
             <button 
               onClick={handleGenerate} 
-              className="flex-1 bg-[#d6045b] text-white py-3.5 rounded-xl font-black shadow-lg shadow-[#d6045b]/20 active:scale-95 transition-transform uppercase tracking-widest text-[11px]"
+              className="flex-1 bg-[#fa005a] text-white py-3.5 rounded-xl font-black shadow-lg shadow-[#fa005a]/20 active:scale-95 transition-transform uppercase tracking-widest text-[11px]"
             >
               GENERAR TICKET
             </button>
@@ -424,7 +437,7 @@ const App: React.FC = () => {
                 name="phone" 
                 value={formData.phone} 
                 onChange={handleInputChange} 
-                className="w-full px-5 py-3 bg-gray-50/50 border border-gray-100 rounded-2xl font-black text-gray-800 outline-none focus:ring-2 focus:ring-[#d6045b]/20 transition-all text-xs text-center" 
+                className="w-full px-5 py-3 bg-gray-50/50 border border-gray-100 rounded-2xl font-black text-gray-800 outline-none focus:ring-2 focus:ring-[#fa005a]/20 transition-all text-xs text-center" 
                 placeholder="Introducir WhatsApp (Ej: 521...)" 
               />
               <div className="absolute left-4 top-1/2 -translate-y-1/2 opacity-20">
@@ -436,7 +449,7 @@ const App: React.FC = () => {
               <button 
                 onClick={handleSendSingle} 
                 disabled={isProcessing}
-                className="bg-[#d6045b] text-white font-black rounded-2xl h-14 shadow-lg active:scale-95 transition-all disabled:opacity-50 flex flex-col items-center justify-center gap-1 overflow-hidden group relative"
+                className="bg-[#fa005a] text-white font-black rounded-2xl h-14 shadow-lg active:scale-95 transition-all disabled:opacity-50 flex flex-col items-center justify-center gap-1 overflow-hidden group relative"
               >
                 <div className="absolute inset-0 bg-white/10 translate-y-full group-active:translate-y-0 transition-transform duration-300"></div>
                 <svg className="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">

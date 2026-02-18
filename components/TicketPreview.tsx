@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { TicketData } from '../types';
@@ -9,7 +8,7 @@ interface TicketPreviewProps {
   innerRef: React.RefObject<HTMLDivElement>;
 }
 
-// Added YoshiLogo component and exported it to resolve errors in App.tsx and PromoPreview.tsx
+// Componente YoshiLogo para uso interno y exportación
 export const YoshiLogo: React.FC<{ className?: string; color?: string }> = ({ className, color = COLORS.PRIMARY }) => (
   <svg 
     className={className} 
@@ -67,30 +66,24 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
         {/* Logo subido */}
         <FullLogo className="w-full h-auto max-h-[3.2rem]" />
         
-        {/* Espaciado mínimo: mt-0 */}
-        <div className="flex flex-col items-center mt-0 space-y-0.5">
+        {/* Espaciado ajustado para bajar 'Cortesía' un espacio más (mt-4) */}
+        <div className="flex flex-col items-center mt-4 space-y-0.5">
           {data.cortesia && (
             <span className="text-[20px] font-normal text-[#fa005a] uppercase tracking-[0.2em] animate-in zoom-in-95 duration-500 leading-none">
               Cortesía
             </span>
           )}
-          
-          {data.showExtraData && data.extraData && data.extraData.trim() !== '' && (
-            <span className="text-[14px] font-semibold text-gray-500 uppercase tracking-tight text-center max-w-full px-4 leading-tight italic opacity-70">
-              {data.extraData}
-            </span>
-          )}
         </div>
       </div>
 
-      {/* Sección de Saldo bajada ligeramente: mt-[-2px] */}
+      {/* Sección de Saldo bajada visualmente: mt-6 */}
       {data.saldo && data.saldo.trim() !== '' && (
-        <div className="relative px-8 pt-0 pb-0 mt-[-2px] z-20">
+        <div className="relative px-8 pt-0 pb-0 mt-6 z-20">
           <div 
             className="w-full h-16 rounded-[1.2rem] shadow-md flex flex-col items-center justify-center text-white overflow-hidden relative"
             style={{ backgroundColor: COLORS.PRIMARY }}
           >
-            <div className="absolute inset-0 opacity-10 flex flex-wrap gap-2 pa1 overflow-hidden rotate-12 scale-150">
+            <div className="absolute inset-0 opacity-10 flex flex-wrap gap-2 p-1 overflow-hidden rotate-12 scale-150">
               {Array.from({ length: 20 }).map((_, i) => (
                 <YoshiLogo key={i} className="h-4 w-4" color="#FFFFFF" />
               ))}
@@ -140,14 +133,26 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({ data, innerRef }) 
           </div>
         )}
 
-        <div className="mt-auto pt-1 pb-4 w-full border-t border-dashed border-gray-200/30">
-          <p className="text-[19px] font-medium text-gray-400 text-center leading-snug tracking-tight">
-            Solicita tu saldo remanente desde<br/>
-            <span className="text-[18px] text-[#fa005a] font-normal lowercase tracking-widest block">
-              yoshicash.com/refunds
+        {/* Personalización movida debajo de 'VÁLIDO EN RECINTO' con dos espacios extra (mt-6) */}
+        {data.showExtraData && data.extraData && data.extraData.trim() !== '' && (
+          <div className="mt-6">
+            <span className="text-[14px] font-semibold text-gray-500 uppercase tracking-tight text-center max-w-full px-4 leading-tight italic opacity-70 block">
+              {data.extraData}
             </span>
-          </p>
-        </div>
+          </div>
+        )}
+
+        {/* Leyenda condicional basada en cortesía */}
+        {!data.cortesia && (
+          <div className="mt-auto pt-1 pb-4 w-full border-t border-dashed border-gray-200/30">
+            <p className="text-[19px] font-medium text-gray-400 text-center leading-snug tracking-tight">
+              Solicita tu saldo remanente desde<br/>
+              <span className="text-[18px] text-[#fa005a] font-normal lowercase tracking-widest block">
+                yoshicash.com/refunds
+              </span>
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
