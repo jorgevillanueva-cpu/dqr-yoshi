@@ -1,0 +1,7 @@
+{
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "name": "Yoshi Cash",
+  "description": "Digitalizador QR de tickets Yoshi Cash."
+}

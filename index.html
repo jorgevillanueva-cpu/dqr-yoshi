@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- Meta etiquetas críticas para PWA e iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="YoshiCash">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#fa005a">
+    <meta name="format-detection" content="telephone=no">
+    
+    <title>Yoshi Cash - Digitalizador QR</title>
+    
+    <!-- Iconos de Pestaña (Favicon) - SVG Optimizado -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 600'%3E%3Cg transform='translate(0,600) scale(0.1,-0.1)' fill='%23fa005a'%3E%3Cpath d='M1600 5426 l0 -126 -564 -2 -563 -3 -5 -1160 c-6 -1711 -3 -1796 77 -2050 78 -251 203 -454 405 -656 291 -291 619 -446 1018 -479 64 -5 363 -10 665 -10 l547 0 1 418 c1 229 1 423 0 429 -3 19 22 16 121 -14 l88 -26 0 -649 0 -648 388 0 c213 0 430 5 482 10 360 38 629 160 866 395 119 118 197 226 264 368 79 165 122 319 134 487 9 116 13 1197 5 1560 -7 350 -16 433 -69 639 -133 524 -468 986 -931 1287 -197 128 -498 254 -709 298 -228 47 -256 48 -1262 53 l-958 5 0 -126z m1870 -477 c286 -26 534 -114 775 -274 120 -80 330 -289 414 -413 122 -180 203 -373 253 -602 l23 -105 0 -940 0 -940 -29 -85 c-83 -248 -254 -421 -497 -503 -77 -27 -234 -47 -361 -47 l-68 0 0 310 c0 171 -1 313 -2 318 -2 4 96 9 217 12 206 5 223 6 265 28 58 30 95 66 128 121 35 59 43 179 17 248 -24 63 -94 136 -158 164 -50 22 -66 24 -377 30 -271 5 -343 10 -435 27 -403 78 -734 256 -1010 543 -104 108 -144 158 -216 271 -128 199 -230 458 -269 682 -11 66 -24 198 -30 295 -11 199 -14 854 -3 864 11 11 1238 8 1363 -4z m-1949 -599 c-2 -286 0 -384 14 -505 75 -662 384 -1216 911 -1636 45 -35 98 -77 118 -93 l38 -28 -4 -277 -3 -276 -210 -3 c-240 -4 -454 11 -562 38 -86 23 -218 82 -300 137 -139 92 -290 266 -364 420 -68 141 -88 239 -99 473 -11 226 -13 2093 -3 2104 4 3 110 5 237 4 l231 -3 -4 -355z'/%3E%3Cpath d='M4180 3426 c-96 -28 -161 -80 -206 -167 -26 -48 -29 -64 -29 -149 0 -84 3 -101 27 -145 133 -251 499 -231 598 33 61 159 -24 355 -178 412 -70 26 -155 33 -212 16z'/%3E%3C/g%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 600'%3E%3Cg transform='translate(0,600) scale(0.1,-0.1)' fill='%23fa005a'%3E%3Cpath d='M1600 5426 l0 -126 -564 -2 -563 -3 -5 -1160 c-6 -1711 -3 -1796 77 -2050 78 -251 203 -454 405 -656 291 -291 619 -446 1018 -479 64 -5 363 -10 665 -10 l547 0 1 418 c1 229 1 423 0 429 -3 19 22 16 121 -14 l88 -26 0 -649 0 -648 388 0 c213 0 430 5 482 10 360 38 629 160 866 395 119 118 197 226 264 368 79 165 122 319 134 487 9 116 13 1197 5 1560 -7 350 -16 433 -69 639 -133 524 -468 986 -931 1287 -197 128 -498 254 -709 298 -228 47 -256 48 -1262 53 l-958 5 0 -126z m1870 -477 c286 -26 534 -114 775 -274 120 -80 330 -289 414 -413 122 -180 203 -373 253 -602 l23 -105 0 -940 0 -940 -29 -85 c-83 -248 -254 -421 -497 -503 -77 -27 -234 -47 -361 -47 l-68 0 0 310 c0 171 -1 313 -2 318 -2 4 96 9 217 12 206 5 223 6 265 28 58 30 95 66 128 121 35 59 43 179 17 248 -24 63 -94 136 -158 164 -50 22 -66 24 -377 30 -271 5 -343 10 -435 27 -403 78 -734 256 -1010 543 -104 108 -144 158 -216 271 -128 199 -230 458 -269 682 -11 66 -24 198 -30 295 -11 199 -14 854 -3 864 11 11 1238 8 1363 -4z m-1949 -599 c-2 -286 0 -384 14 -505 75 -662 384 -1216 911 -1636 45 -35 98 -77 118 -93 l38 -28 -4 -277 -3 -276 -210 -3 c-240 -4 -454 11 -562 38 -86 23 -218 82 -300 137 -139 92 -290 266 -364 420 -68 141 -88 239 -99 473 -11 226 -13 2093 -3 2104 4 3 110 5 237 4 l231 -3 -4 -355z'/%3E%3Cpath d='M4180 3426 c-96 -28 -161 -80 -206 -167 -26 -48 -29 -64 -29 -149 0 -84 3 -101 27 -145 133 -251 499 -231 598 33 61 159 -24 355 -178 412 -70 26 -155 33 -212 16z'/%3E%3C/g%3E%3C/svg%3E">
+    
+    <!-- Manifiesto Estándar -->
+    <link rel="manifest" href="manifest.json">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        -webkit-tap-highlight-color: transparent;
+        overflow-x: hidden;
+        margin: 0;
+        padding: 0;
+        background-color: #f9fafb;
+      }
+      #root {
+        height: 100vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      @keyframes bounce-slow {
+        0%, 100% { transform: translateY(-5%); animation-timing-function: cubic-bezier(0.8, 0, 1, 1); }
+        50% { transform: translateY(0); animation-timing-function: cubic-bezier(0, 0, 0.2, 1); }
+      }
+      .animate-bounce-slow {
+        animation: bounce-slow 3s infinite;
+      }
+    </style>
+    
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "qrcode.react": "https://esm.sh/qrcode.react@^4.2.0",
+    "html2canvas": "https://esm.sh/html2canvas@^1.4.1",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "tesseract.js": "https://esm.sh/tesseract.js@^5.1.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
