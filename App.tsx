@@ -4,6 +4,11 @@ import { TicketPreview } from '@/ui/ticket';
 import { YoshiLogo, ChivasLogo } from '@/ui/logos';
 import { TicketData } from './types';
 import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 
 const initialFormData: TicketData = {
   saldo: '',
@@ -26,6 +31,11 @@ const App: React.FC = () => {
   // Estados para Chivas
   const [formDataChivas, setFormDataChivas] = useState<TicketData>({ ...initialFormData, isTokens: true });
   const [showPreviewChivas, setShowPreviewChivas] = useState(false);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  
+  // Estados para carga masiva
+  const [bulkTickets, setBulkTickets] = useState<TicketData[]>([]);
+  const [bulkIndex, setBulkIndex] = useState(0);
 
   const formData = activeTab === 'yoshi' ? formDataYoshi : formDataChivas;
   const setFormData = activeTab === 'yoshi' ? setFormDataYoshi : setFormDataChivas;
@@ -42,6 +52,23 @@ const App: React.FC = () => {
   const [isStandalone, setIsStandalone] = useState(false);
 
   const ticketRef = useRef<HTMLDivElement>(null);
+  const bulkRefs = useRef<React.RefObject<HTMLDivElement>[]>([]);
+
+  // Sync valido AND saldo (Valido para) field with bulkTickets
+  useEffect(() => {
+    if (bulkTickets.length > 0) {
+      setBulkTickets(prev => prev.map(t => ({ 
+        ...t, 
+        valido: formData.valido,
+        // Only sync saldo if it's a token list (Chivas tab or Yoshi with tokens checked)
+        saldo: (activeTab === 'chivas' || (activeTab === 'yoshi' && t.isTokens)) ? formData.saldo : t.saldo
+      })));
+    }
+  }, [formData.valido, formData.saldo, activeTab]);
+
+  useEffect(() => {
+    bulkRefs.current = bulkTickets.map((_, i) => bulkRefs.current[i] || React.createRef());
+  }, [bulkTickets.length]);
 
   useEffect(() => {
     const standalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
@@ -174,10 +201,201 @@ const App: React.FC = () => {
     if (activeTab === 'chivas') clearData.isTokens = true;
     setFormData(clearData);
     setShowPreview(false);
+    setBulkTickets([]);
+    setBulkIndex(0);
     showPopMessage("Campos limpiados");
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+
+    const processData = (data: any[]) => {
+      if (!data || data.length === 0) return;
+
+      const getVal = (row: any, ...targets: string[]) => {
+        if (typeof row !== 'object' || row === null) return row?.toString() || '';
+        const keys = Object.keys(row);
+        for (const target of targets) {
+          const key = keys.find(k => k.toLowerCase().trim() === target.toLowerCase().trim());
+          if (key) return row[key];
+        }
+        return '';
+      };
+
+      const tickets: TicketData[] = data.map(row => {
+        const keys = typeof row === 'object' && row !== null ? Object.keys(row) : [];
+        const firstColVal = keys.length > 0 ? row[keys[0]] : row;
+
+        const tipoVal = getVal(row, 'Tipo').toString().toLowerCase();
+        const isCortesia = tipoVal.includes('cortesía') || tipoVal.includes('cortesia');
+        const isTokens = activeTab === 'chivas' || tipoVal.includes('tokens') || keys.length <= 1;
+        
+        let codigo = (firstColVal || '').toString().trim();
+        if (activeTab === 'yoshi' && !isTokens) {
+          codigo = codigo.toLowerCase();
+        }
+
+        return {
+          ...initialFormData,
+          codigo: codigo,
+          saldo: getVal(row, 'Saldo', 'Balance').toString() || formData.saldo,
+          valido: formData.valido,
+          cortesia: isCortesia,
+          showExtraData: isCortesia,
+          extraData: getVal(row, 'Comentario', 'Comment', 'Personalizar').toString(),
+          isTokens: isTokens
+        };
+      });
+
+      if (tickets.length > 0) {
+        setBulkTickets(tickets);
+        setBulkIndex(0);
+        setFormData(tickets[0]);
+        setShowPreview(true);
+        showPopMessage(`Se cargaron ${tickets.length} tickets`, "success");
+      } else {
+        showPopMessage("No se encontraron datos válidos en el archivo", "error");
+      }
+    };
+
+    if (fileExtension === 'csv') {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          // If no headers detected (fields is empty or looks generic), retry without header option or process as simple list
+          if (results.meta.fields && results.meta.fields.length <= 1 && results.data.length > 0) {
+             // Treat as simple list of values
+             Papa.parse(file, {
+               header: false,
+               skipEmptyLines: true,
+               complete: (res2) => processData(res2.data.flat())
+             });
+          } else {
+             processData(results.data);
+          }
+        },
+        error: (error) => {
+          showPopMessage("Error al procesar el archivo CSV", "error");
+          console.error(error);
+        }
+      });
+    } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const data = evt.target?.result;
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+          processData(jsonData);
+        } catch (error) {
+          showPopMessage("Error al procesar el archivo Excel", "error");
+          console.error(error);
+        }
+      };
+      reader.onerror = () => showPopMessage("Error al leer el archivo", "error");
+      reader.readAsArrayBuffer(file);
+    } else {
+      showPopMessage("Formato de archivo no soportado", "error");
+    }
+  };
+
+  const nextBulkTicket = () => {
+    if (bulkIndex < bulkTickets.length - 1) {
+      const nextIdx = bulkIndex + 1;
+      setBulkIndex(nextIdx);
+      setFormData(bulkTickets[nextIdx]);
+    }
+  };
+
+  const prevBulkTicket = () => {
+    if (bulkIndex > 0) {
+      const prevIdx = bulkIndex - 1;
+      setBulkIndex(prevIdx);
+      setFormData(bulkTickets[prevIdx]);
+    }
+  };
+
   const handleCopyToClipboard = async () => {
+    if (bulkTickets.length > 1) {
+      setIsProcessing(true);
+      try {
+        const canvases = [];
+        let totalHeight = 0;
+        let maxWidth = 0;
+
+        for (let i = 0; i < bulkTickets.length; i++) {
+          showPopMessage(`Preparando ticket ${i + 1} de ${bulkTickets.length}...`, "info");
+          const el = document.getElementById(`bulk-ticket-${i}`);
+          if (el) {
+            const canvas = await html2canvas(el, { 
+              scale: 2, 
+              useCORS: true,
+              logging: false,
+              allowTaint: true
+            });
+            canvases.push(canvas);
+            totalHeight += canvas.height + 40; 
+            maxWidth = Math.max(maxWidth, canvas.width);
+            
+            // Allow browser to breathe
+            if (i % 5 === 0) await new Promise(r => setTimeout(r, 10));
+          }
+        }
+
+        if (canvases.length === 0) {
+          showPopMessage("No hay tickets para copiar", "error");
+          return;
+        }
+
+        showPopMessage("Uniendo imágenes...", "info");
+
+        const finalCanvas = document.createElement('canvas');
+        finalCanvas.width = maxWidth + 40;
+        finalCanvas.height = totalHeight + 40;
+        const ctx = finalCanvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+          let currentY = 20;
+          for (const canvas of canvases) {
+            const x = (finalCanvas.width - canvas.width) / 2;
+            ctx.drawImage(canvas, x, currentY);
+            currentY += canvas.height + 40;
+          }
+        }
+
+        const blob = await new Promise<Blob | null>(res => finalCanvas.toBlob(res, 'image/png'));
+        if (blob) {
+          try {
+            await navigator.clipboard.write([
+              new ClipboardItem({ [blob.type]: blob })
+            ]);
+            showPopMessage(`¡${bulkTickets.length} tickets copiados!`, "success");
+          } catch (clipErr) {
+            // Fallback for some browsers/iframes
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Batch-Tickets.png`;
+            a.click();
+            showPopMessage("Copiado no soportado, descargando imagen completa", "info");
+          }
+        }
+      } catch (e) {
+        console.error(e);
+        showPopMessage("Error al procesar lote", "error");
+      } finally {
+        setIsProcessing(false);
+      }
+      return;
+    }
+
     const el = ticketRef.current;
     if (!el) return;
 
@@ -220,19 +438,94 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDownload = async () => {
+  const handleDownload = async (format: 'png' | 'pdf') => {
+    if (bulkTickets.length > 1) {
+      setIsProcessing(true);
+      setShowDownloadMenu(false);
+      try {
+        const zip = format === 'png' ? new JSZip() : null;
+        const pdf = format === 'pdf' ? new jsPDF({ orientation: 'portrait', unit: 'px' }) : null;
+
+        for (let i = 0; i < bulkTickets.length; i++) {
+          showPopMessage(`Generando ticket ${i + 1} de ${bulkTickets.length}...`, "info");
+          
+          const el = document.getElementById(`bulk-ticket-${i}`);
+          if (!el) continue;
+
+          const canvas = await html2canvas(el, { 
+            scale: 2, 
+            useCORS: true,
+            logging: false,
+            allowTaint: true,
+            imageTimeout: 0
+          });
+
+          if (format === 'png' && zip) {
+            const base64 = canvas.toDataURL('image/png').split(',')[1];
+            const name = `${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-${bulkTickets[i].codigo || i}.png`;
+            zip.file(name, base64, { base64: true });
+          } else if (format === 'pdf' && pdf) {
+            const imgData = canvas.toDataURL('image/png');
+            const w = canvas.width / 2;
+            const h = canvas.height / 2;
+            
+            if (i > 0) pdf.addPage([w, h], 'p');
+            else {
+              // @ts-ignore
+              pdf.internal.pageSize.width = w;
+              // @ts-ignore
+              pdf.internal.pageSize.height = h;
+            }
+            pdf.addImage(imgData, 'PNG', 0, 0, w, h);
+          }
+          
+          // Small delay to allow browser to breathe
+          if (i % 5 === 0) await new Promise(r => setTimeout(r, 10));
+        }
+
+        if (format === 'png' && zip) {
+          showPopMessage("Comprimiendo archivos...", "info");
+          const content = await zip.generateAsync({ type: 'blob' });
+          saveAs(content, `${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-Lote.zip`);
+          showPopMessage("Archivo ZIP listo", "success");
+        } else if (format === 'pdf' && pdf) {
+          pdf.save(`${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-Lote.pdf`);
+          showPopMessage("Archivo PDF listo", "success");
+        }
+      } catch (e) {
+        showPopMessage("Error en descarga masiva", "error");
+        console.error(e);
+      } finally {
+        setIsProcessing(false);
+      }
+      return;
+    }
+
     const el = ticketRef.current;
     if (!el) return;
     setIsProcessing(true);
+    setShowDownloadMenu(false);
     try {
       const canvas = await html2canvas(el, { scale: 3, useCORS: true });
-      const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
-      if (blob) {
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-${formData.codigo || 'ticket'}.png`;
-        a.click();
-        showPopMessage("Imagen descargada", "success");
+      if (format === 'png') {
+        const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
+        if (blob) {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = `${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-${formData.codigo || 'ticket'}.png`;
+          a.click();
+          showPopMessage("Imagen descargada", "success");
+        }
+      } else {
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'px',
+          format: [canvas.width / 3, canvas.height / 3]
+        });
+        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 3, canvas.height / 3);
+        pdf.save(`${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-${formData.codigo || 'ticket'}.pdf`);
+        showPopMessage("PDF descargado", "success");
       }
     } catch (e) {
       showPopMessage("Error al descargar", "error");
@@ -479,6 +772,12 @@ const App: React.FC = () => {
               </div>
               
               <div className="flex items-center gap-2">
+                <label className={`p-3 bg-gray-100 text-gray-400 rounded-xl active:scale-95 transition-all border border-gray-200 shadow-sm flex items-center justify-center cursor-pointer ${activeTab === 'yoshi' ? 'hover:bg-gray-200' : 'hover:bg-[#ee2e24]/10 hover:text-[#ee2e24]'}`} title="Adjuntar archivo (CSV, XLS, XLSX)">
+                  <input type="file" accept=".csv, .xls, .xlsx" onChange={handleFileUpload} className="hidden" />
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                  </svg>
+                </label>
                 <button 
                   onClick={handleClear} 
                   className={`p-3 bg-gray-100 text-gray-400 rounded-xl active:scale-95 transition-all border border-gray-200 shadow-sm flex items-center justify-center ${activeTab === 'yoshi' ? 'hover:bg-gray-200' : 'hover:bg-[#ee2e24]/10 hover:text-[#ee2e24]'}`}
@@ -493,7 +792,13 @@ const App: React.FC = () => {
           )}
 
           {activeTab === 'chivas' && (
-            <div className="flex items-center justify-end">
+            <div className="flex items-center justify-end gap-2">
+              <label className="p-3 bg-gray-100 text-gray-400 rounded-xl active:scale-95 transition-all border border-gray-200 shadow-sm flex items-center justify-center cursor-pointer hover:bg-[#ee2e24]/10 hover:text-[#ee2e24]" title="Adjuntar archivo (CSV, XLS, XLSX)">
+                <input type="file" accept=".csv, .xls, .xlsx" onChange={handleFileUpload} className="hidden" />
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                </svg>
+              </label>
               <button 
                 onClick={handleClear} 
                 className="p-3 bg-gray-100 text-gray-400 rounded-xl active:scale-95 transition-all border border-gray-200 shadow-sm flex items-center justify-center hover:bg-[#ee2e24]/10 hover:text-[#ee2e24]"
@@ -598,43 +903,83 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                <button 
-                  onClick={handleSendSingle} 
-                  disabled={isProcessing}
-                  className={`${activeTab === 'yoshi' ? 'bg-[#fa005a]/90' : 'bg-[#ee2e24]/90'} text-white font-black rounded-2xl h-14 shadow-lg active:scale-95 transition-all disabled:opacity-50 flex flex-col items-center justify-center gap-1 overflow-hidden group relative`}
-                >
-                  <div className="absolute inset-0 bg-white/10 translate-y-full group-active:translate-y-0 transition-transform duration-300"></div>
-                  <svg className="w-4 h-4 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                  </svg>
-                  <span className="text-[7px] uppercase tracking-[0.1em] relative z-10">WhatsApp</span>
-                </button>
+              {bulkTickets.length <= 1 && (
+                <div className="grid grid-cols-3 gap-2 animate-in fade-in duration-300">
+                  <button 
+                    onClick={handleSendSingle} 
+                    disabled={isProcessing}
+                    className={`${activeTab === 'yoshi' ? 'bg-[#fa005a]/90' : 'bg-[#ee2e24]/90'} text-white font-black rounded-2xl h-14 shadow-lg active:scale-95 transition-all disabled:opacity-50 flex flex-col items-center justify-center gap-1 overflow-hidden group relative`}
+                  >
+                    <div className="absolute inset-0 bg-white/10 translate-y-full group-active:translate-y-0 transition-transform duration-300"></div>
+                    <svg className="w-4 h-4 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                    <span className="text-[7px] uppercase tracking-[0.1em] relative z-10">WhatsApp</span>
+                  </button>
 
-                <button 
-                  onClick={handleCopyToClipboard} 
-                  disabled={isProcessing}
-                  className={`bg-gray-100/80 text-gray-800 font-black rounded-2xl h-14 shadow-lg active:scale-95 transition-all disabled:opacity-50 flex flex-col items-center justify-center gap-1 overflow-hidden group relative border ${activeTab === 'yoshi' ? 'border-gray-200/50' : 'border-[#ee2e24]/20'}`}
-                >
-                  <div className="absolute inset-0 bg-gray-200 translate-y-full group-active:translate-y-0 transition-transform duration-300"></div>
-                  <svg className="w-4 h-4 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                  <span className="text-[7px] uppercase tracking-[0.1em] relative z-10">Copiar</span>
-                </button>
-                
-                <button 
-                  onClick={handleShare} 
-                  disabled={isProcessing}
-                  className={`${activeTab === 'yoshi' ? 'bg-gray-900/80' : 'bg-[#ee2e24]/80'} text-white font-black rounded-2xl h-14 shadow-lg active:scale-95 transition-all disabled:opacity-50 flex flex-col items-center justify-center gap-1 overflow-hidden group relative`}
-                >
-                  <div className="absolute inset-0 bg-white/10 translate-y-full group-active:translate-y-0 transition-transform duration-300"></div>
-                  <svg className="w-4 h-4 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                  </svg>
-                  <span className="text-[7px] uppercase tracking-[0.1em] relative z-10">Compartir</span>
-                </button>
-              </div>
+                  <button 
+                    onClick={handleCopyToClipboard} 
+                    disabled={isProcessing}
+                    className={`bg-gray-100/80 text-gray-800 font-black rounded-2xl h-14 shadow-lg active:scale-95 transition-all disabled:opacity-50 flex flex-col items-center justify-center gap-1 overflow-hidden group relative border ${activeTab === 'yoshi' ? 'border-gray-200/50' : 'border-[#ee2e24]/20'}`}
+                  >
+                    <div className="absolute inset-0 bg-gray-200 translate-y-full group-active:translate-y-0 transition-transform duration-300"></div>
+                    <svg className="w-4 h-4 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-[7px] uppercase tracking-[0.1em] relative z-10">Copiar</span>
+                  </button>
+                  
+                  <button 
+                    onClick={handleShare} 
+                    disabled={isProcessing}
+                    className={`${activeTab === 'yoshi' ? 'bg-gray-900/80' : 'bg-[#ee2e24]/80'} text-white font-black rounded-2xl h-14 shadow-lg active:scale-95 transition-all disabled:opacity-50 flex flex-col items-center justify-center gap-1 overflow-hidden group relative`}
+                  >
+                    <div className="absolute inset-0 bg-white/10 translate-y-full group-active:translate-y-0 transition-transform duration-300"></div>
+                    <svg className="w-4 h-4 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                    <span className="text-[7px] uppercase tracking-[0.1em] relative z-10">Compartir</span>
+                  </button>
+                </div>
+              )}
+
+              {(activeTab === 'chivas' || (activeTab === 'yoshi' && (formData.cortesia || formData.isTokens))) && (
+                <div className="relative mt-2">
+                  <button 
+                    onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                    disabled={isProcessing}
+                    className={`w-full ${activeTab === 'yoshi' ? 'bg-[#fa005a]' : 'bg-[#ee2e24]'} text-white font-black rounded-2xl h-12 shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2 uppercase tracking-widest text-[10px]`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Descargar Ticket
+                  </button>
+                  
+                  {showDownloadMenu && (
+                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-[100] animate-in slide-in-from-bottom-2 duration-200">
+                      <button 
+                        onClick={() => handleDownload('png')}
+                        className="w-full px-6 py-4 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 border-b border-gray-50"
+                      >
+                        <div className={`p-2 rounded-lg ${activeTab === 'yoshi' ? 'bg-[#fa005a]/10 text-[#fa005a]' : 'bg-[#ee2e24]/10 text-[#ee2e24]'}`}>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        </div>
+                        <span className="text-xs font-black text-gray-700 uppercase tracking-wider">Descargar Imagen (PNG)</span>
+                      </button>
+                      <button 
+                        onClick={() => handleDownload('pdf')}
+                        className="w-full px-6 py-4 text-left hover:bg-gray-50 transition-colors flex items-center gap-3"
+                      >
+                        <div className={`p-2 rounded-lg ${activeTab === 'yoshi' ? 'bg-[#fa005a]/10 text-[#fa005a]' : 'bg-[#ee2e24]/10 text-[#ee2e24]'}`}>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                        </div>
+                        <span className="text-xs font-black text-gray-700 uppercase tracking-wider">Descargar Documento (PDF)</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -642,9 +987,44 @@ const App: React.FC = () => {
 
       {showPreview && (
           <div className="w-full max-w-md animate-in fade-in slide-in-from-right-10 duration-700 pb-20">
+            {bulkTickets.length > 1 && (
+              <div className="mb-4 flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                <button 
+                  onClick={prevBulkTicket} 
+                  disabled={bulkIndex === 0}
+                  className="p-2 rounded-xl bg-gray-100 text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-200 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <div className="text-center">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Ticket en lote</span>
+                  <p className="text-sm font-black text-gray-900">{bulkIndex + 1} <span className="text-gray-300">/</span> {bulkTickets.length}</p>
+                </div>
+                <button 
+                  onClick={nextBulkTicket} 
+                  disabled={bulkIndex === bulkTickets.length - 1}
+                  className="p-2 rounded-xl bg-gray-100 text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-200 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" /></svg>
+                </button>
+              </div>
+            )}
             <TicketPreview data={formData} innerRef={ticketRef} activeTab={activeTab} />
           </div>
         )}
+      </div>
+
+      {/* Hidden container for bulk rendering */}
+      <div className="fixed top-0 left-0 -z-50 opacity-0 pointer-events-none overflow-hidden h-0 w-0">
+        {bulkTickets.map((ticket, index) => (
+          <div key={`${index}-${bulkTickets.length}`} id={`bulk-ticket-${index}`} className="w-[375px] bg-white">
+            <TicketPreview 
+              data={ticket} 
+              activeTab={activeTab} 
+              innerRef={bulkRefs.current[index] || React.createRef()}
+            />
+          </div>
+        ))}
       </div>
     </div>
   );
