@@ -4,7 +4,6 @@ import { TicketPreview } from '@/ui/ticket';
 import { YoshiLogo, ChivasLogo } from '@/ui/logos';
 import { TicketData } from './types';
 import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
@@ -31,7 +30,6 @@ const App: React.FC = () => {
   // Estados para Chivas
   const [formDataChivas, setFormDataChivas] = useState<TicketData>({ ...initialFormData, isTokens: true });
   const [showPreviewChivas, setShowPreviewChivas] = useState(false);
-  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   
   // Estados para carga masiva
   const [bulkTickets, setBulkTickets] = useState<TicketData[]>([]);
@@ -227,13 +225,20 @@ const App: React.FC = () => {
 
       const tickets: TicketData[] = data.map(row => {
         const keys = typeof row === 'object' && row !== null ? Object.keys(row) : [];
-        const firstColVal = keys.length > 0 ? row[keys[0]] : row;
+        
+        // Intenta buscar por encabezado primero para evitar tomar "Cortesía" como código
+        let codigo = getVal(row, 'Código', 'Codigo', 'Code', 'ID', 'Ticket', 'Folio').toString().trim();
+        
+        // Si no hay encabezados claros, usa la primera columna
+        if (!codigo) {
+          const firstColVal = keys.length > 0 ? row[keys[0]] : row;
+          codigo = (firstColVal || '').toString().trim();
+        }
 
         const tipoVal = getVal(row, 'Tipo').toString().toLowerCase();
         const isCortesia = tipoVal.includes('cortesía') || tipoVal.includes('cortesia');
         const isTokens = activeTab === 'chivas' || tipoVal.includes('tokens') || keys.length <= 1;
         
-        let codigo = (firstColVal || '').toString().trim();
         if (activeTab === 'yoshi' && !isTokens) {
           codigo = codigo.toLowerCase();
         }
@@ -438,60 +443,40 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDownload = async (format: 'png' | 'pdf') => {
+  const handleDownload = async () => {
     if (bulkTickets.length > 1) {
       setIsProcessing(true);
-      setShowDownloadMenu(false);
       try {
-        const zip = format === 'png' ? new JSZip() : null;
-        const pdf = format === 'pdf' ? new jsPDF({ orientation: 'portrait', unit: 'px' }) : null;
-
-        for (let i = 0; i < bulkTickets.length; i++) {
-          showPopMessage(`Generando ticket ${i + 1} de ${bulkTickets.length}...`, "info");
+        const zip = new JSZip();
+        const concurrencyLimit = 5; // Carga de 5 en 5 para balancear velocidad y memoria
+        
+        for (let i = 0; i < bulkTickets.length; i += concurrencyLimit) {
+          const chunk = bulkTickets.slice(i, i + concurrencyLimit);
+          showPopMessage(`Procesando lote ${Math.floor(i / concurrencyLimit) + 1} de ${Math.ceil(bulkTickets.length / concurrencyLimit)}...`, "info");
           
-          const el = document.getElementById(`bulk-ticket-${i}`);
-          if (!el) continue;
+          await Promise.all(chunk.map(async (ticket, chunkIdx) => {
+            const index = i + chunkIdx;
+            const el = document.getElementById(`bulk-ticket-${index}`);
+            if (!el) return;
 
-          const canvas = await html2canvas(el, { 
-            scale: 2, 
-            useCORS: true,
-            logging: false,
-            allowTaint: true,
-            imageTimeout: 0
-          });
+            const canvas = await html2canvas(el, { 
+              scale: 2, 
+              useCORS: true,
+              logging: false,
+              allowTaint: true,
+              imageTimeout: 0
+            });
 
-          if (format === 'png' && zip) {
             const base64 = canvas.toDataURL('image/png').split(',')[1];
-            const name = `${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-${bulkTickets[i].codigo || i}.png`;
+            const name = `${index + 1}_${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-${ticket.codigo || 'ticket'}.png`;
             zip.file(name, base64, { base64: true });
-          } else if (format === 'pdf' && pdf) {
-            const imgData = canvas.toDataURL('image/png');
-            const w = canvas.width / 2;
-            const h = canvas.height / 2;
-            
-            if (i > 0) pdf.addPage([w, h], 'p');
-            else {
-              // @ts-ignore
-              pdf.internal.pageSize.width = w;
-              // @ts-ignore
-              pdf.internal.pageSize.height = h;
-            }
-            pdf.addImage(imgData, 'PNG', 0, 0, w, h);
-          }
-          
-          // Small delay to allow browser to breathe
-          if (i % 5 === 0) await new Promise(r => setTimeout(r, 10));
+          }));
         }
 
-        if (format === 'png' && zip) {
-          showPopMessage("Comprimiendo archivos...", "info");
-          const content = await zip.generateAsync({ type: 'blob' });
-          saveAs(content, `${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-Lote.zip`);
-          showPopMessage("Archivo ZIP listo", "success");
-        } else if (format === 'pdf' && pdf) {
-          pdf.save(`${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-Lote.pdf`);
-          showPopMessage("Archivo PDF listo", "success");
-        }
+        showPopMessage("Comprimiendo archivos...", "info");
+        const content = await zip.generateAsync({ type: 'blob' });
+        saveAs(content, `${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-Lote.zip`);
+        showPopMessage("Archivo ZIP listo", "success");
       } catch (e) {
         showPopMessage("Error en descarga masiva", "error");
         console.error(e);
@@ -504,28 +489,15 @@ const App: React.FC = () => {
     const el = ticketRef.current;
     if (!el) return;
     setIsProcessing(true);
-    setShowDownloadMenu(false);
     try {
       const canvas = await html2canvas(el, { scale: 3, useCORS: true });
-      if (format === 'png') {
-        const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
-        if (blob) {
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = `${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-${formData.codigo || 'ticket'}.png`;
-          a.click();
-          showPopMessage("Imagen descargada", "success");
-        }
-      } else {
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF({
-          orientation: 'portrait',
-          unit: 'px',
-          format: [canvas.width / 3, canvas.height / 3]
-        });
-        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 3, canvas.height / 3);
-        pdf.save(`${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-${formData.codigo || 'ticket'}.pdf`);
-        showPopMessage("PDF descargado", "success");
+      const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
+      if (blob) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-${formData.codigo || 'ticket'}.png`;
+        a.click();
+        showPopMessage("Imagen descargada", "success");
       }
     } catch (e) {
       showPopMessage("Error al descargar", "error");
@@ -946,38 +918,15 @@ const App: React.FC = () => {
               {(activeTab === 'chivas' || (activeTab === 'yoshi' && (formData.cortesia || formData.isTokens))) && (
                 <div className="relative mt-2">
                   <button 
-                    onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                    onClick={() => handleDownload()}
                     disabled={isProcessing}
                     className={`w-full ${activeTab === 'yoshi' ? 'bg-[#fa005a]' : 'bg-[#ee2e24]'} text-white font-black rounded-2xl h-12 shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2 uppercase tracking-widest text-[10px]`}
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    Descargar Ticket
+                    {bulkTickets.length > 1 ? `Descargar Lote (${bulkTickets.length})` : 'Descargar Ticket'}
                   </button>
-                  
-                  {showDownloadMenu && (
-                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-[100] animate-in slide-in-from-bottom-2 duration-200">
-                      <button 
-                        onClick={() => handleDownload('png')}
-                        className="w-full px-6 py-4 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 border-b border-gray-50"
-                      >
-                        <div className={`p-2 rounded-lg ${activeTab === 'yoshi' ? 'bg-[#fa005a]/10 text-[#fa005a]' : 'bg-[#ee2e24]/10 text-[#ee2e24]'}`}>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                        </div>
-                        <span className="text-xs font-black text-gray-700 uppercase tracking-wider">Descargar Imagen (PNG)</span>
-                      </button>
-                      <button 
-                        onClick={() => handleDownload('pdf')}
-                        className="w-full px-6 py-4 text-left hover:bg-gray-50 transition-colors flex items-center gap-3"
-                      >
-                        <div className={`p-2 rounded-lg ${activeTab === 'yoshi' ? 'bg-[#fa005a]/10 text-[#fa005a]' : 'bg-[#ee2e24]/10 text-[#ee2e24]'}`}>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                        </div>
-                        <span className="text-xs font-black text-gray-700 uppercase tracking-wider">Descargar Documento (PDF)</span>
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
