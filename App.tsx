@@ -2,8 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { TicketPreview } from '@/ui/ticket';
 import { YoshiLogo, ChivasLogo } from '@/ui/logos';
+import { renderTicketToCanvas } from '@/ui/ticketRenderer';
 import { TicketData } from './types';
-import html2canvas from 'html2canvas';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
@@ -18,6 +18,18 @@ const initialFormData: TicketData = {
   isTokens: false,
   showExtraData: false,
   extraData: ''
+};
+
+const getEffectiveTicket = (ticket: TicketData, globalForm: TicketData, tab: 'yoshi' | 'chivas'): TicketData => {
+  const isTokens = tab === 'chivas' || (tab === 'yoshi' && ticket.isTokens);
+  return {
+    ...ticket,
+    valido: globalForm.valido || ticket.valido,
+    saldo: isTokens ? (globalForm.saldo || ticket.saldo) : ticket.saldo,
+    cortesia: globalForm.cortesia || ticket.cortesia,
+    showExtraData: globalForm.showExtraData || ticket.showExtraData,
+    extraData: globalForm.showExtraData ? (globalForm.extraData || ticket.extraData) : ticket.extraData,
+  };
 };
 
 const App: React.FC = () => {
@@ -50,23 +62,6 @@ const App: React.FC = () => {
   const [isStandalone, setIsStandalone] = useState(false);
 
   const ticketRef = useRef<HTMLDivElement>(null);
-  const bulkRefs = useRef<React.RefObject<HTMLDivElement>[]>([]);
-
-  // Sync valido AND saldo (Valido para) field with bulkTickets
-  useEffect(() => {
-    if (bulkTickets.length > 0) {
-      setBulkTickets(prev => prev.map(t => ({ 
-        ...t, 
-        valido: formData.valido,
-        // Only sync saldo if it's a token list (Chivas tab or Yoshi with tokens checked)
-        saldo: (activeTab === 'chivas' || (activeTab === 'yoshi' && t.isTokens)) ? formData.saldo : t.saldo
-      })));
-    }
-  }, [formData.valido, formData.saldo, activeTab]);
-
-  useEffect(() => {
-    bulkRefs.current = bulkTickets.map((_, i) => bulkRefs.current[i] || React.createRef());
-  }, [bulkTickets.length]);
 
   useEffect(() => {
     const standalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
@@ -213,52 +208,59 @@ const App: React.FC = () => {
     const processData = (data: any[]) => {
       if (!data || data.length === 0) return;
 
-      const getVal = (row: any, ...targets: string[]) => {
-        if (typeof row !== 'object' || row === null) return row?.toString() || '';
-        const keys = Object.keys(row);
+      const sampleRow = data.find(r => typeof r === 'object' && r !== null) || {};
+      const keys = Object.keys(sampleRow);
+      
+      const findKey = (...targets: string[]) => {
         for (const target of targets) {
           const key = keys.find(k => k.toLowerCase().trim() === target.toLowerCase().trim());
-          if (key) return row[key];
+          if (key) return key;
         }
-        return '';
+        return null;
       };
 
-      const tickets: TicketData[] = data.map(row => {
-        const keys = typeof row === 'object' && row !== null ? Object.keys(row) : [];
-        
-        // Intenta buscar por encabezado primero para evitar tomar "Cortesía" como código
-        let codigo = getVal(row, 'Código', 'Codigo', 'Code', 'ID', 'Ticket', 'Folio').toString().trim();
-        
-        // Si no hay encabezados claros, usa la primera columna
-        if (!codigo) {
-          const firstColVal = keys.length > 0 ? row[keys[0]] : row;
-          codigo = (firstColVal || '').toString().trim();
+      const codigoKey = findKey('Código', 'Codigo', 'Code', 'ID', 'Ticket', 'Folio');
+      const saldoKey = findKey('Saldo', 'Balance');
+      const tipoKey = findKey('Tipo');
+      const extraKey = findKey('Comentario', 'Comment', 'Personalizar');
+
+      const tickets: TicketData[] = new Array(data.length);
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i];
+        let codigo = '';
+        if (codigoKey && row[codigoKey] !== undefined) {
+          codigo = row[codigoKey].toString().trim();
+        } else if (typeof row === 'object' && row !== null) {
+          const rKeys = Object.keys(row);
+          codigo = (rKeys.length > 0 ? row[rKeys[0]] : '').toString().trim();
+        } else {
+          codigo = (row || '').toString().trim();
         }
 
-        const tipoVal = getVal(row, 'Tipo').toString().toLowerCase();
+        const tipoVal = (tipoKey && row[tipoKey] ? row[tipoKey] : '').toString().toLowerCase();
         const isCortesia = tipoVal.includes('cortesía') || tipoVal.includes('cortesia');
         const isTokens = activeTab === 'chivas' || tipoVal.includes('tokens') || keys.length <= 1;
-        
+
         if (activeTab === 'yoshi' && !isTokens) {
           codigo = codigo.toLowerCase();
         }
 
-        return {
+        tickets[i] = {
           ...initialFormData,
           codigo: codigo,
-          saldo: getVal(row, 'Saldo', 'Balance').toString() || formData.saldo,
+          saldo: (saldoKey && row[saldoKey] ? row[saldoKey].toString() : '') || formData.saldo,
           valido: formData.valido,
           cortesia: isCortesia,
           showExtraData: isCortesia,
-          extraData: getVal(row, 'Comentario', 'Comment', 'Personalizar').toString(),
+          extraData: extraKey && row[extraKey] ? row[extraKey].toString() : '',
           isTokens: isTokens
         };
-      });
+      }
 
       if (tickets.length > 0) {
         setBulkTickets(tickets);
         setBulkIndex(0);
-        setFormData(tickets[0]);
+        setFormData(getEffectiveTicket(tickets[0], formData, activeTab));
         setShowPreview(true);
         showPopMessage(`Se cargaron ${tickets.length} tickets`, "success");
       } else {
@@ -271,9 +273,7 @@ const App: React.FC = () => {
         header: true,
         skipEmptyLines: true,
         complete: (results) => {
-          // If no headers detected (fields is empty or looks generic), retry without header option or process as simple list
           if (results.meta.fields && results.meta.fields.length <= 1 && results.data.length > 0) {
-             // Treat as simple list of values
              Papa.parse(file, {
                header: false,
                skipEmptyLines: true,
@@ -314,7 +314,7 @@ const App: React.FC = () => {
     if (bulkIndex < bulkTickets.length - 1) {
       const nextIdx = bulkIndex + 1;
       setBulkIndex(nextIdx);
-      setFormData(bulkTickets[nextIdx]);
+      setFormData(getEffectiveTicket(bulkTickets[nextIdx], formData, activeTab));
     }
   };
 
@@ -322,7 +322,7 @@ const App: React.FC = () => {
     if (bulkIndex > 0) {
       const prevIdx = bulkIndex - 1;
       setBulkIndex(prevIdx);
-      setFormData(bulkTickets[prevIdx]);
+      setFormData(getEffectiveTicket(bulkTickets[prevIdx], formData, activeTab));
     }
   };
 
@@ -335,22 +335,17 @@ const App: React.FC = () => {
         let maxWidth = 0;
 
         for (let i = 0; i < bulkTickets.length; i++) {
-          showPopMessage(`Preparando ticket ${i + 1} de ${bulkTickets.length}...`, "info");
-          const el = document.getElementById(`bulk-ticket-${i}`);
-          if (el) {
-            const canvas = await html2canvas(el, { 
-              scale: 2, 
-              useCORS: true,
-              logging: false,
-              allowTaint: true
-            });
-            canvases.push(canvas);
-            totalHeight += canvas.height + 40; 
-            maxWidth = Math.max(maxWidth, canvas.width);
-            
-            // Allow browser to breathe
-            if (i % 5 === 0) await new Promise(r => setTimeout(r, 10));
+          const ticket = getEffectiveTicket(bulkTickets[i], formData, activeTab);
+          
+          if (i % 10 === 0 || i === bulkTickets.length - 1) {
+            showPopMessage(`Preparando ticket ${i + 1} de ${bulkTickets.length}...`, "info");
+            await new Promise(r => setTimeout(r, 0));
           }
+
+          const canvas = await renderTicketToCanvas(ticket, activeTab, 2);
+          canvases.push(canvas);
+          totalHeight += canvas.height + 40; 
+          maxWidth = Math.max(maxWidth, canvas.width);
         }
 
         if (canvases.length === 0) {
@@ -359,6 +354,7 @@ const App: React.FC = () => {
         }
 
         showPopMessage("Uniendo imágenes...", "info");
+        await new Promise(r => setTimeout(r, 10));
 
         const finalCanvas = document.createElement('canvas');
         finalCanvas.width = maxWidth + 40;
@@ -383,7 +379,6 @@ const App: React.FC = () => {
             ]);
             showPopMessage(`¡${bulkTickets.length} tickets copiados!`, "success");
           } catch (clipErr) {
-            // Fallback for some browsers/iframes
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -401,12 +396,10 @@ const App: React.FC = () => {
       return;
     }
 
-    const el = ticketRef.current;
-    if (!el) return;
-
     setIsProcessing(true);
     try {
-      const canvas = await html2canvas(el, { scale: 3, useCORS: true });
+      const ticket = getEffectiveTicket(formData, formData, activeTab);
+      const canvas = await renderTicketToCanvas(ticket, activeTab, 2);
       const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
       if (blob && navigator.clipboard) {
         await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
@@ -422,14 +415,13 @@ const App: React.FC = () => {
   };
 
   const handleSendSingle = async () => {
-    const el = ticketRef.current;
     const phone = formData.phone;
     if (!phone || phone.length < 10) return showPopMessage("Ingresa un WhatsApp válido", "error");
-    if (!el) return;
 
     setIsProcessing(true);
     try {
-      const canvas = await html2canvas(el, { scale: 3, useCORS: true });
+      const ticket = getEffectiveTicket(formData, formData, activeTab);
+      const canvas = await renderTicketToCanvas(ticket, activeTab, 2);
       const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
       if (blob && navigator.clipboard) {
         await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
@@ -448,35 +440,28 @@ const App: React.FC = () => {
       setIsProcessing(true);
       try {
         const zip = new JSZip();
-        const concurrencyLimit = 5; // Carga de 5 en 5 para balancear velocidad y memoria
-        
-        for (let i = 0; i < bulkTickets.length; i += concurrencyLimit) {
-          const chunk = bulkTickets.slice(i, i + concurrencyLimit);
-          showPopMessage(`Procesando lote ${Math.floor(i / concurrencyLimit) + 1} de ${Math.ceil(bulkTickets.length / concurrencyLimit)}...`, "info");
-          
-          await Promise.all(chunk.map(async (ticket, chunkIdx) => {
-            const index = i + chunkIdx;
-            const el = document.getElementById(`bulk-ticket-${index}`);
-            if (!el) return;
+        const total = bulkTickets.length;
 
-            const canvas = await html2canvas(el, { 
-              scale: 2, 
-              useCORS: true,
-              logging: false,
-              allowTaint: true,
-              imageTimeout: 0
-            });
+        for (let i = 0; i < total; i++) {
+          const rawTicket = bulkTickets[i];
+          const ticket = getEffectiveTicket(rawTicket, formData, activeTab);
 
-            const base64 = canvas.toDataURL('image/png').split(',')[1];
-            const name = `${index + 1}_${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-${ticket.codigo || 'ticket'}.png`;
-            zip.file(name, base64, { base64: true });
-          }));
+          if (i % 10 === 0 || i === total - 1) {
+            showPopMessage(`Generando ticket ${i + 1} de ${total}...`, "info");
+            await new Promise(r => setTimeout(r, 0));
+          }
+
+          const canvas = await renderTicketToCanvas(ticket, activeTab, 2);
+          const base64 = canvas.toDataURL('image/png').split(',')[1];
+          const name = `${i + 1}_${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-${ticket.codigo || 'ticket'}.png`;
+          zip.file(name, base64, { base64: true });
         }
 
-        showPopMessage("Comprimiendo archivos...", "info");
+        showPopMessage("Comprimiendo archivo ZIP...", "info");
+        await new Promise(r => setTimeout(r, 10));
         const content = await zip.generateAsync({ type: 'blob' });
         saveAs(content, `${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-Lote.zip`);
-        showPopMessage("Archivo ZIP listo", "success");
+        showPopMessage("¡Archivo ZIP listo!", "success");
       } catch (e) {
         showPopMessage("Error en descarga masiva", "error");
         console.error(e);
@@ -486,11 +471,10 @@ const App: React.FC = () => {
       return;
     }
 
-    const el = ticketRef.current;
-    if (!el) return;
     setIsProcessing(true);
     try {
-      const canvas = await html2canvas(el, { scale: 3, useCORS: true });
+      const ticket = getEffectiveTicket(formData, formData, activeTab);
+      const canvas = await renderTicketToCanvas(ticket, activeTab, 2);
       const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
       if (blob) {
         const a = document.createElement('a');
@@ -507,11 +491,10 @@ const App: React.FC = () => {
   };
 
   const handleShare = async () => {
-    const el = ticketRef.current;
-    if (!el) return;
     setIsProcessing(true);
     try {
-      const canvas = await html2canvas(el, { scale: 3, useCORS: true });
+      const ticket = getEffectiveTicket(formData, formData, activeTab);
+      const canvas = await renderTicketToCanvas(ticket, activeTab, 2);
       const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
       if (blob) {
         const file = new File([blob], `${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-${formData.codigo || 'ticket'}.png`, { type: 'image/png' });
@@ -520,7 +503,7 @@ const App: React.FC = () => {
         } else {
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
-          a.download = `${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-${formData.codigo}.png`;
+          a.download = `${activeTab === 'yoshi' ? 'Yoshi' : 'Chivas'}-${formData.codigo || 'ticket'}.png`;
           a.click();
         }
       }
@@ -961,19 +944,6 @@ const App: React.FC = () => {
             <TicketPreview data={formData} innerRef={ticketRef} activeTab={activeTab} />
           </div>
         )}
-      </div>
-
-      {/* Hidden container for bulk rendering */}
-      <div className="fixed top-0 left-0 -z-50 opacity-0 pointer-events-none overflow-hidden h-0 w-0">
-        {bulkTickets.map((ticket, index) => (
-          <div key={`${index}-${bulkTickets.length}`} id={`bulk-ticket-${index}`} className="w-[375px] bg-white">
-            <TicketPreview 
-              data={ticket} 
-              activeTab={activeTab} 
-              innerRef={bulkRefs.current[index] || React.createRef()}
-            />
-          </div>
-        ))}
       </div>
     </div>
   );

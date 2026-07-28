@@ -1,0 +1,399 @@
+import QRCode from 'qrcode';
+import { TicketData } from '../types';
+import { COLORS } from '../constants';
+
+// SVG strings for logos
+const FULL_LOGO_SVG = `<svg viewBox="0 0 600 218" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"><g transform="translate(0.000000,218.000000) scale(0.100000,-0.100000)" stroke="none"><g fill="${COLORS.PRIMARY}"><path d="M450 1906 l0 -36 -160 0 -161 0 3 -437 c3 -427 4 -439 25 -493 51 -124 150 -223 271 -271 51 -21 77 -24 260 -27 l202 -3 0 120 c0 109 2 121 18 121 43 -1 45 -9 43 -200 l-2 -182 153 4 c184 5 238 22 322 99 117 107 136 176 136 504 0 247 -8 333 -40 422 -63 180 -222 330 -409 386 -58 18 -104 21 -363 24 l-298 5 0 -36z m595 -150 c168 -45 300 -180 334 -344 15 -72 15 -542 0 -593 -26 -87 -113 -149 -207 -149 l-52 0 0 90 0 90 65 0 c57 0 69 3 90 25 33 32 33 78 0 110 -22 23 -32 25 -112 25 -176 1 -294 43 -403 146 -79 75 -134 170 -155 271 -9 40 -15 125 -11 206 l0 137 203 0 c137 0 218 -5 252 -14z m-613 -213 c5 -136 9 -168 31 -230 43 -125 119 -234 213 -306 l54 -42 0 -84 0 -84 -106 6 c-118 8 -168 24 -227 77 -95 83 -106 142 -107 543 l0 277 69 0 69 0 4 -157z"/><path d="M1135 1315 c-34 -33 -34 -92 0 -129 68 -73 191 18 143 107 -18 34 -39 46 -81 47 -27 0 -45 -7 -62 -25z"/></g><g fill="#333333"><path d="M1943 1628 c28 -67 339 -877 343 -894 8 -33 -41 -163 -79 -209 -41 -50 -81 -65 -176 -65 l-79 0 -17 -95 c-10 -53 -14 -99 -10 -103 3 -4 56 -9 117 -10 145 -5 225 19 301 88 76 70 109 132 203 386 165 443 316 847 330 880 l14 34 -133 0 -133 0 -94 -310 c-51 -171 -96 -310 -100 -310 -4 0 -54 139 -111 310 l-104 310 -139 0 c-107 0 -137 -3 -133 -12z"/><path d="M3186 1609 c-65 -15 -155 -70 -204 -124 -173 -189 -174 -527 -3 -708 87 -92 198 -137 341 -137 278 0 470 202 470 495 0 231 -132 417 -334 471 -57 15 -210 17 -270 3z m213 -193 c42 -22 88 -80 103 -128 8 -25 13 -94 13 -168 0 -115 -2 -130 -27 -182 -30 -65 -68 -94 -136 -104 -138 -21 -221 77 -230 271 -7 163 21 251 97 302 40 27 135 32 180 9z"/><path d="M4045 1606 c-156 -49 -237 -179 -205 -330 22 -106 93 -170 275 -247 164 -69 197 -108 141 -164 -29 -29 -78 -39 -165 -33 -60 5 -104 20 -193 66 -8 4 -88 -150 -88 -168 0 -6 24 -22 53 -35 138 -65 356 -74 474 -20 119 53 182 158 170 285 -12 131 -81 196 -299 281 -56 22 -113 50 -125 61 -43 41 -20 108 42 124 50 12 168 -2 217 -26 26 -13 49 -22 52 -19 2 2 22 41 45 87 l42 83 -53 23 c-29 13 -77 28 -106 35 -70 15 -226 13 -277 -3z"/><path d="M4590 1335 l0 -695 129 0 130 0 -6 305 c-7 348 -10 335 75 396 91 64 193 63 230 -4 15 -29 17 -68 17 -364 l0 -333 128 0 128 0 -3 378 c-4 426 -6 438 -80 512 -103 103 -309 92 -445 -25 -23 -19 -44 -35 -48 -35 -4 0 -3 126 1 280 l7 280 -132 0 -131 0 0 -695z"/><path d="M5674 1998 c-26 -5 -53 -21 -74 -43 -27 -28 -34 -44 -38 -89 -5 -68 21 -117 79 -146 106 -54 229 18 229 135 0 97 -92 164 -196 143z"/><path d="M5590 1110 l0 -470 125 0 125 0 0 470 0 470 -125 0 -125 0 0 -470z"/><path d="M4681 443 c-48 -24 -71 -67 -71 -131 0 -74 22 -116 74 -142 79 -38 165 -16 198 49 21 43 16 51 -30 51 -26 0 -41 -6 -50 -20 -17 -27 -77 -28 -92 -1 -17 33 -12 106 8 124 25 23 59 21 79 -3 12 -14 30 -20 60 -20 42 0 42 0 32 29 -6 16 -21 39 -35 52 -33 31 -124 37 -173 12z"/><path d="M4998 445 c-27 -15 -48 -43 -48 -64 0 -17 68 -13 96 5 31 21 74 6 74 -26 0 -17 -6 -20 -50 -20 -92 0 -140 -34 -140 -99 0 -72 88 -112 163 -73 29 16 37 17 37 6 0 -10 13 -14 41 -14 l41 0 -3 120 c-4 115 -5 121 -31 147 -23 23 -38 28 -90 30 -43 2 -72 -2 -90 -12z m122 -185 c0 -23 -41 -53 -66 -48 -22 4 -39 31 -31 52 5 11 19 16 52 16 38 0 45 -3 45 -20z"/><path d="M5308 445 c-34 -19 -48 -44 -48 -84 0 -39 35 -67 103 -81 64 -13 82 -23 74 -44 -9 -22 -85 -22 -93 -1 -9 22 -94 21 -94 -1 0 -28 54 -71 98 -79 92 -15 166 19 178 82 5 27 1 37 -23 62 -18 18 -45 32 -69 36 -91 15 -116 35 -70 56 20 10 30 9 50 -5 32 -20 96 -22 96 -2 0 8 -11 27 -24 42 -20 24 -32 28 -87 31 -44 2 -72 -1 -91 -12z"/><path d="M5570 355 l0 -195 45 0 45 0 0 105 c0 93 2 105 19 115 28 14 57 12 75 -6 12 -12 16 -38 16 -115 l0 -99 43 0 43 0 -3 118 c-3 64 -9 127 -15 138 -21 43 -94 57 -148 29 l-30 -16 0 61 0 60 -45 0 -45 0 0 -195z"/></g></g></svg>`;
+
+const YOSHI_ICON_SVG = `<svg viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"><g transform="translate(0.000000,600.000000) scale(0.100000,-0.100000)" fill="#ffffff" stroke="none"><path d="M1600 5426 l0 -126 -564 -2 -563 -3 -5 -1160 c-6 -1711 -3 -1796 77 -2050 78 -251 203 -454 405 -656 291 -291 619 -446 1018 -479 64 -5 363 -10 665 -10 l547 0 1 418 c1 229 1 423 0 429 -3 19 22 16 121 -14 l88 -26 0 -649 0 -648 388 0 c213 0 430 5 482 10 360 38 629 160 866 395 119 118 197 226 264 368 79 165 122 319 134 487 9 116 13 1197 5 1560 -7 350 -16 433 -69 639 -133 524 -468 986 -931 1287 -197 128 -498 254 -709 298 -228 47 -256 48 -1262 53 l-958 5 0 -126z m1870 -477 c286 -26 534 -114 775 -274 120 -80 330 -289 414 -413 122 -180 203 -373 253 -602 l23 -105 0 -940 0 -940 -29 -85 c-83 -248 -254 -421 -497 -503 -77 -27 -234 -47 -361 -47 l-68 0 0 310 c0 171 -1 313 -2 318 -2 4 96 9 217 12 206 5 223 6 265 28 58 30 95 66 128 121 35 59 43 179 17 248 -24 63 -94 136 -158 164 -50 22 -66 24 -377 30 -271 5 -343 10 -435 27 -403 78 -734 256 -1010 543 -104 108 -144 158 -216 271 -128 199 -230 458 -269 682 -11 66 -24 198 -30 295 -11 199 -14 854 -3 864 11 11 1238 8 1363 -4z m-1949 -599 c-2 -286 0 -384 14 -505 75 -662 384 -1216 911 -1636 45 -35 98 -77 118 -93 l38 -28 -4 -277 -3 -276 -210 -3 c-240 -4 -454 11 -562 38 -86 23 -218 82 -300 137 -139 92 -290 266 -364 420 -68 141 -88 239 -99 473 -11 226 -13 2093 -3 2104 4 3 110 5 237 4 l231 -3 -4 -355z"/><path d="M4180 3426 c-96 -28 -161 -80 -206 -167 -26 -48 -29 -64 -29 -149 0 -84 3 -101 27 -145 133 -251 499 -231 598 33 61 159 -24 355 -178 412 -70 26 -155 33 -212 16z"/></g></svg>`;
+
+const CHIVAS_LOGO_SVG = `<svg viewBox="0 0 371 336" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"><g transform="translate(0.000000,336.000000) scale(0.100000,-0.100000)" fill="#ee2e24" stroke="none"><path d="M1900 3339 c-69 -13 -178 -72 -255 -136 -143 -121 -278 -348 -366 -618 -23 -71 -43 -132 -45 -134 -2 -2 -52 -8 -111 -13 -146 -12 -333 -43 -417 -68 -154 -48 -229 -100 -268 -185 -20 -46 -22 -63 -20 -205 3 -172 -9 -239 -55 -317 -30 -52 -70 -81 -173 -123 -123 -50 -170 -73 -170 -81 0 -10 64 -49 80 -49 26 0 177 -79 217 -114 70 -61 94 -125 104 -274 14 -212 25 -248 97 -320 117 -117 312 -162 709 -162 l131 0 51 -106 c152 -319 369 -465 613 -413 58 13 162 62 218 103 99 74 223 221 294 349 l38 67 51 1 c29 0 156 4 282 8 255 10 300 20 421 92 67 41 214 175 253 233 105 152 31 265 -211 325 -98 25 -302 32 -322 11 -14 -15 37 -60 114 -101 30 -15 65 -37 78 -48 28 -25 58 -92 66 -153 7 -45 6 -47 -38 -84 -56 -46 -133 -80 -217 -93 -100 -17 -395 -26 -403 -13 -3 6 5 62 18 124 14 62 39 177 55 256 34 155 51 322 34 322 -14 0 -83 -76 -110 -120 -33 -54 -52 -133 -68 -275 -14 -126 -41 -238 -72 -299 l-15 -29 -371 8 c-205 4 -419 10 -477 14 l-105 6 -24 85 c-20 70 -24 108 -24 215 0 72 4 148 9 170 l10 40 147 17 c80 9 152 18 159 20 6 2 -10 19 -38 38 -174 119 -289 273 -334 449 -18 69 -21 104 -18 200 5 132 38 275 68 291 86 46 935 51 1505 9 90 -6 148 -15 162 -25 23 -14 49 -88 55 -153 3 -33 1 -35 -97 -90 -92 -52 -100 -60 -98 -85 1 -16 3 -30 5 -31 2 -1 54 -5 116 -7 l113 -4 31 43 c30 41 34 43 82 43 47 0 53 -3 92 -45 l41 -45 80 0 c66 0 85 4 104 20 l24 20 -45 42 c-25 24 -67 63 -94 87 l-48 43 4 82 c3 72 7 86 36 128 18 27 51 58 72 70 22 13 40 26 40 29 0 17 -124 32 -180 22 -39 -7 -45 -12 -48 -35 -4 -30 -23 -38 -94 -38 -54 0 -78 18 -78 58 0 52 5 52 -324 54 l-309 3 -33 145 c-54 238 -116 403 -189 500 -40 55 -156 170 -200 200 -82 55 -193 73 -315 49z m205 -85 c15 -10 50 -49 79 -88 112 -151 178 -287 214 -438 23 -95 48 -276 39 -285 -3 -3 -216 -2 -472 2 -432 7 -465 9 -465 25 0 69 77 370 127 500 43 109 211 261 333 301 36 12 115 3 145 -17z m-921 -1016 c3 -18 12 -159 21 -313 8 -154 24 -431 35 -615 11 -184 23 -388 27 -452 l6 -118 -100 0 c-222 0 -375 76 -441 219 -21 45 -27 76 -30 153 -7 170 -18 155 178 253 94 47 170 87 170 89 0 3 -194 124 -318 199 l-34 20 4 146 c5 178 23 233 105 321 77 84 181 126 315 129 57 1 57 1 62 -31z m1216 -1717 c0 -11 -16 -56 -35 -101 -78 -183 -175 -280 -315 -316 -139 -35 -263 11 -344 129 -35 51 -126 262 -126 292 0 13 51 15 410 15 397 0 410 -1 410 -19z"/></g></svg>`;
+
+const CHIVAS_SHIELD_SVG = `<svg viewBox="0 0 379 379" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"><g transform="translate(0.000000,379.000000) scale(0.066667,-0.066667)" fill="#002b5c" stroke="none"><path d="M2783 5520 l0 -108 -83 -31 c-169 -62 -264 -140 -316 -257 -40 -91 -36 -94 89 -64 139 33 137 34 121 -24 -8 -26 -14 -73 -14 -104 0 -42 -7 -57 -31 -65 -54 -17 -146 -121 -166 -187 l-19 -64 -151 9 c-101 5 -189 21 -267 46 -630 205 -1128 13 -1128 -433 0 -113 71 -313 125 -353 51 -37 66 -96 31 -119 -958 -629 -1213 -1740 -592 -2581 1071 -1452 3850 -1452 4921 0 600 813 381 1900 -507 2519 -118 83 -127 94 -101 125 203 250 234 464 95 669 -181 267 -536 326 -1047 175 -85 -25 -190 -43 -281 -49 l-145 -8 -10 43 c-6 24 -21 60 -34 80 -21 34 -20 38 6 53 112 62 182 176 165 268 -15 82 -187 219 -275 220 -14 0 -19 32 -19 110 0 153 -68 211 -275 230 l-92 9 0 -109z m215 20 c132 -53 130 -276 -2 -318 -83 -27 -504 -110 -529 -104 -90 18 148 190 357 258 21 6 26 25 26 96 0 119 11 124 148 68z m205 -329 c143 -59 224 -186 119 -186 -54 0 -156 -42 -206 -83 -31 -27 -56 -36 -77 -30 -17 5 -64 13 -103 18 -39 5 -71 12 -71 15 0 40 116 189 191 246 66 51 73 51 147 20z m-313 -100 c-20 -27 -51 -76 -68 -110 -28 -56 -38 -63 -100 -73 -89 -13 -92 -9 -66 93 l22 85 97 26 c150 39 159 37 115 -21z m462 -176 c-40 -79 -131 -128 -178 -97 -59 38 -45 63 64 115 94 45 143 37 114 -18z m-338 -84 c79 -23 230 -142 209 -163 -16 -16 -205 35 -294 80 l-87 44 -52 -28 c-104 -55 -330 -117 -330 -90 0 29 144 138 209 158 93 28 248 28 345 -1z m-66 -163 c49 -20 138 -45 198 -55 97 -17 109 -22 109 -52 0 -73 -12 -81 -126 -81 -59 0 -148 -10 -196 -23 -80 -21 -98 -21 -181 0 -50 13 -139 23 -198 23 -112 0 -124 8 -124 81 0 30 11 35 115 52 63 9 150 34 191 53 97 46 103 46 212 2z m-1243 -15 c56 -12 146 -36 200 -53 54 -18 157 -40 229 -49 145 -19 155 -28 79 -73 l-52 -30 50 -50 c43 -43 81 -136 63 -154 -3 -3 -31 5 -62 18 -69 29 -111 31 -85 5 22 -22 24 -147 2 -147 -8 0 -40 17 -71 38 -69 47 -74 46 -85 -6 -20 -93 -162 -182 -289 -182 -103 0 -146 -65 -101 -152 29 -54 22 -65 -30 -52 -51 13 -102 94 -91 148 6 35 -1 46 -53 79 -143 90 -160 256 -35 338 59 39 96 38 96 -5 2 -116 214 -173 325 -87 142 111 52 285 -172 332 -299 62 -588 -129 -588 -389 0 -136 38 -213 199 -396 43 -50 90 -104 105 -122 15 -17 38 -45 53 -61 332 -378 486 -788 363 -972 -21 -30 -46 -56 -56 -56 -27 0 -53 117 -42 190 9 62 8 65 -27 65 -41 0 -62 21 -75 75 -5 22 -27 45 -53 57 -51 22 -62 65 -44 156 30 145 -9 223 -284 561 -323 398 -362 580 -174 812 133 163 405 226 705 162z m2798 -26 c249 -115 355 -370 249 -597 -52 -111 -114 -199 -267 -383 -115 -138 -159 -194 -198 -253 -54 -80 -79 -199 -60 -286 16 -77 -2 -127 -54 -150 -18 -8 -33 -26 -33 -38 0 -41 -45 -90 -82 -90 -34 0 -36 -5 -33 -86 5 -169 -30 -210 -95 -113 -148 222 44 627 592 1244 278 312 82 700 -352 700 -201 1 -345 -82 -345 -198 1 -214 345 -255 388 -47 l10 45 64 -32 c144 -71 144 -241 -1 -341 -55 -38 -66 -52 -60 -83 9 -49 -36 -123 -89 -145 -56 -23 -62 -15 -35 51 18 43 19 62 5 92 -18 40 -32 46 -151 59 -126 15 -223 85 -244 178 -12 50 -16 50 -85 4 -31 -21 -63 -38 -71 -38 -22 0 -20 125 2 147 26 26 -16 24 -85 -5 -31 -13 -60 -20 -64 -16 -18 18 19 106 64 151 l51 51 -52 30 c-76 45 -66 55 83 75 74 9 190 35 256 56 257 81 538 88 692 18z m-2133 -91 c1 -58 54 -154 112 -202 66 -54 51 -73 -67 -81 -67 -5 -67 -5 -76 50 -5 30 -20 72 -35 94 -24 37 -24 41 5 78 17 21 31 52 31 67 0 15 7 28 15 28 8 0 15 -15 15 -34z m975 -1 c0 -12 14 -39 31 -61 l31 -39 -31 -51 c-17 -27 -31 -71 -31 -97 l0 -46 -71 9 c-127 16 -133 27 -57 100 47 44 72 84 85 134 18 67 43 96 43 51z m-1680 -41 c128 -58 157 -129 83 -202 -88 -88 -220 -27 -193 89 19 81 20 80 -110 41 -249 -76 -313 -292 -130 -436 l37 -29 -60 -31 c-78 -40 -67 -44 -123 53 -183 321 153 670 496 515z m2654 7 c230 -68 320 -307 196 -524 -55 -95 -44 -91 -122 -51 -61 31 -61 32 -29 54 194 136 118 377 -142 447 -117 32 -114 33 -92 -50 29 -110 -99 -169 -194 -87 -155 133 124 288 383 211z m-1556 -112 c72 -24 100 -28 121 -15 37 23 203 61 266 60 l53 0 -55 -51 c-59 -54 -217 -113 -304 -113 -108 0 -354 108 -354 156 0 21 169 -2 273 -37z m-40 -160 c86 -24 218 -16 301 18 42 18 60 19 76 6 31 -26 24 -40 -25 -51 -25 -5 -87 -26 -137 -45 l-92 -36 -137 47 c-75 26 -139 49 -142 52 -16 12 36 50 57 41 13 -6 57 -20 99 -32z m-293 -75 c0 -23 -58 -47 -150 -64 -101 -18 -121 -14 -87 20 30 30 237 68 237 44z m189 -10 c32 -11 96 -38 142 -60 l83 -40 89 44 c191 92 198 92 296 4 61 -55 52 -71 -60 -105 -251 -77 -398 -79 -623 -8 -149 47 -154 57 -71 132 68 62 66 61 144 33z m794 -1 c52 -8 126 -68 84 -68 -38 0 -179 32 -208 47 -50 26 -41 48 15 38 27 -4 76 -12 109 -17z m-1320 -69 c13 -21 9 -23 -57 -33 -52 -8 -55 -7 -40 20 16 31 81 40 97 13z m1594 -14 c17 -29 16 -30 -23 -22 -71 16 -81 21 -72 37 16 26 75 16 95 -15z m-1107 -151 c165 -50 382 -47 554 6 120 38 301 55 301 29 -1 -16 -538 -174 -592 -174 -58 0 -592 158 -593 175 0 23 213 -1 330 -36z m-158 -89 c140 -42 293 -86 341 -98 l87 -23 336 98 c334 98 336 98 525 98 208 0 205 1 151 -70 -80 -104 -82 -124 -82 -792 l0 -619 -39 -73 c-95 -181 -316 -328 -753 -503 -147 -59 -147 -59 -330 15 -391 158 -599 297 -708 475 l-37 60 -8 652 c-8 690 -8 688 -83 786 -53 70 -56 69 155 69 186 0 198 -2 445 -75z m-1015 12 c6 -31 -76 -62 -100 -38 -12 12 -5 24 24 44 46 30 69 28 76 -6z m2935 16 c36 -17 48 -43 29 -62 -18 -18 -96 22 -96 50 0 33 14 36 67 12z m-3232 -183 c0 -10 -39 -47 -86 -80 -832 -589 -1032 -1585 -474 -2351 669 -919 2210 -1279 3464 -811 425 159 902 493 1081 757 14 21 30 41 34 45 42 37 188 306 229 420 252 699 -9 1431 -689 1932 -91 66 -118 108 -72 108 29 0 262 -176 365 -276 161 -154 364 -440 423 -594 11 -29 25 -59 30 -67 81 -116 130 -574 90 -827 -38 -237 -188 -568 -345 -761 -1007 -1241 -3295 -1339 -4454 -192 -634 627 -723 1435 -238 2143 177 259 642 661 642 554z m731 -306 c6 -17 -101 -94 -129 -94 -44 0 -25 47 32 80 67 39 88 42 97 14z m2154 -72 c-12 -32 -72 -14 -153 47 -3 3 -2 15 3 28 8 21 19 19 84 -14 53 -27 72 -45 66 -61z m-2158 -164 c4 -100 -8 -104 -45 -19 -15 35 -30 67 -33 72 -6 10 60 43 70 35 3 -3 7 -43 8 -88z m2063 74 c23 -21 23 -27 -6 -90 -41 -88 -50 -85 -46 19 5 111 6 113 52 71z m-2514 -153 c-8 -33 -62 -108 -112 -154 -62 -57 -191 -306 -232 -450 -79 -275 5 -697 184 -916 380 -468 864 -693 1534 -714 1403 -44 2333 1016 1726 1968 -37 57 -71 108 -75 112 -83 78 -147 195 -107 195 26 0 155 -140 233 -255 457 -667 153 -1479 -699 -1873 -1064 -492 -2465 -84 -2830 823 -120 300 -63 803 115 1023 9 11 48 60 87 110 74 94 152 172 173 172 7 0 8 -19 3 -41z m3639 -73 c0 -11 -12 -26 -26 -34 -52 -29 31 -136 105 -137 31 0 41 -7 41 -30 0 -45 -384 -40 -411 5 -14 24 -9 34 34 68 27 22 88 71 134 110 83 69 123 75 123 18z m-4147 9 c69 -16 127 -75 127 -130 0 -47 -89 -140 -133 -140 -43 0 -42 49 2 68 81 36 36 142 -61 142 -73 -1 -94 -16 -106 -77 -14 -67 -82 -75 -89 -10 -13 110 113 181 260 147z m614 -112 c12 -29 38 -60 58 -69 31 -15 37 -30 44 -105 16 -181 85 -232 178 -133 32 33 59 55 59 48 1 -6 0 -47 -1 -91 -8 -273 322 -554 866 -738 l149 -51 141 49 c563 194 882 472 867 752 -3 50 -4 90 -2 90 2 0 35 -32 73 -70 l71 -70 35 44 c41 50 65 125 65 202 0 43 8 58 40 75 22 12 49 43 60 70 25 61 49 62 99 5 383 -430 355 -1048 -66 -1469 -696 -694 -2071 -694 -2772 1 -376 372 -443 922 -163 1340 122 181 163 205 199 120z m-745 -174 c126 -28 153 -39 153 -61 0 -34 -23 -35 -142 -6 -132 32 -156 30 -177 -18 -31 -70 -113 -82 -92 -13 21 69 69 146 86 140 10 -4 87 -23 172 -42z m4443 -34 c0 -22 -14 -42 -38 -55 -62 -34 -44 -82 30 -82 70 0 97 -46 35 -59 -140 -29 -328 -58 -335 -51 -4 4 -16 46 -26 94 -25 119 10 151 149 138 78 -7 95 -4 118 21 36 39 67 37 67 -6z m-4399 -184 c21 -6 34 -21 34 -39 0 -28 -7 -29 -132 -19 -113 9 -136 7 -158 -15 -67 -67 -10 -97 223 -117 97 -8 52 -49 -53 -47 -232 2 -334 85 -243 195 41 48 220 71 329 42z m4474 -107 c0 -15 -14 -34 -32 -42 -18 -8 -31 -20 -30 -26 1 -6 2 -35 2 -63 0 -42 6 -53 28 -53 38 0 72 -41 52 -61 -28 -28 -372 80 -377 117 -4 25 10 36 67 57 40 15 110 42 155 61 103 42 135 44 135 10z m-4465 -264 c20 -109 -14 -152 -111 -140 -40 5 -77 2 -82 -6 -14 -22 -123 -16 -148 9 -24 25 -47 144 -34 179 7 19 253 40 348 30 8 -1 20 -34 27 -72z m4432 -55 c45 -20 42 -113 -5 -144 -47 -31 -79 -4 -53 46 28 51 20 56 -103 64 l-106 8 0 -47 c0 -41 -5 -47 -39 -47 -38 0 -39 2 -29 71 6 39 13 75 16 80 8 12 280 -14 319 -31z m15 -220 c-2 -14 -26 -31 -51 -38 -62 -16 -97 -122 -49 -148 29 -16 38 -51 15 -66 -8 -4 -77 29 -153 75 -77 45 -145 82 -152 82 -15 0 -16 75 -1 76 6 1 76 10 154 21 212 28 243 28 237 -2z m-4376 -76 c49 -128 36 -185 -51 -228 -123 -59 -237 -19 -295 104 -42 90 -55 77 128 124 191 50 199 50 218 0z m4243 -213 c35 -22 -46 -159 -92 -156 -61 4 -312 87 -312 103 0 47 35 48 162 6 71 -24 130 -44 132 -44 2 0 17 24 34 53 33 55 42 60 76 38z m-4069 -111 c59 -86 61 -100 16 -100 -21 0 -46 19 -69 53 -35 50 -81 68 -99 37 -6 -8 8 -37 29 -65 21 -28 33 -55 28 -60 -23 -23 -60 -6 -93 43 -37 53 -55 61 -89 39 -14 -9 -10 -25 20 -69 84 -124 7 -132 -81 -8 -63 90 -63 90 -29 104 19 8 82 35 140 59 140 60 165 56 227 -33z m3776 -93 c98 -12 183 -26 188 -31 16 -16 -49 -50 -81 -42 -50 12 -139 -92 -108 -127 23 -27 18 -62 -10 -62 -17 0 -142 122 -211 206 -23 27 -25 38 -9 56 23 28 12 28 231 0z m-3617 -98 c139 -151 -54 -272 -209 -131 -31 28 -34 28 -72 3 -38 -24 -41 -24 -65 1 -14 15 -19 29 -10 33 8 3 72 39 142 80 154 90 146 89 214 14z m3392 -95 c116 -49 128 -136 31 -229 -86 -82 -87 -82 -240 24 l-128 88 65 54 c105 86 177 103 272 63z m-3176 -100 c204 -77 100 -300 -123 -264 -111 18 -183 114 -142 190 40 76 167 111 265 74z m2874 -174 c174 -76 194 -102 77 -102 -97 0 -169 -43 -166 -97 2 -28 -6 -40 -28 -43 -47 -7 -137 285 -93 302 35 14 48 10 210 -60z m-2540 -20 c129 -64 135 -160 12 -192 -39 -10 -49 -20 -49 -52 -1 -52 -13 -62 -51 -42 -22 12 -31 32 -31 67 0 64 -50 84 -99 38 -31 -29 -81 -27 -81 4 0 8 37 56 82 107 46 51 83 98 83 104 0 22 47 10 134 -34z m2236 -107 c33 -51 60 -104 60 -118 0 -60 -128 -121 -222 -106 -67 11 -218 189 -180 213 39 25 65 11 113 -62 58 -89 86 -105 150 -87 64 17 63 47 -4 141 -48 67 -50 75 -27 92 40 29 47 25 110 -73z m-1934 -8 c102 -31 134 -46 130 -64 -5 -23 -11 -24 -85 -14 -31 5 -44 -9 -90 -88 -40 -70 -62 -94 -86 -94 -53 0 -52 19 3 111 63 104 63 107 7 127 -44 15 -55 32 -35 52 13 13 4 15 156 -30z m250 -72 c12 -10 -99 -256 -117 -259 -68 -12 -66 27 14 211 30 68 62 83 103 48z m1291 -4 c-4 -20 -23 -28 -80 -31 -117 -8 -171 -90 -94 -145 71 -49 173 -22 157 41 -19 75 49 71 80 -4 22 -54 1 -78 -90 -105 -230 -66 -373 142 -172 252 52 30 205 23 199 -8z m-1152 -106 c27 -113 35 -115 99 -31 77 100 80 103 111 103 52 0 44 -24 -55 -147 -142 -179 -162 -175 -229 48 -39 131 -39 132 10 126 38 -4 44 -14 64 -99z m609 6 c101 -101 22 -219 -146 -219 -152 0 -229 66 -202 173 27 107 257 137 348 46z"/></g></svg>`;
+
+let fullLogoImg: HTMLImageElement | null = null;
+let yoshiIconImg: HTMLImageElement | null = null;
+let chivasLogoImg: HTMLImageElement | null = null;
+let chivasShieldImg: HTMLImageElement | null = null;
+
+function loadImageFromSvg(svgString: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
+  });
+}
+
+export async function preloadTicketLogos() {
+  if (!fullLogoImg) {
+    fullLogoImg = await loadImageFromSvg(FULL_LOGO_SVG);
+  }
+  if (!yoshiIconImg) {
+    yoshiIconImg = await loadImageFromSvg(YOSHI_ICON_SVG);
+  }
+  if (!chivasLogoImg) {
+    chivasLogoImg = await loadImageFromSvg(CHIVAS_LOGO_SVG);
+  }
+  if (!chivasShieldImg) {
+    chivasShieldImg = await loadImageFromSvg(CHIVAS_SHIELD_SVG);
+  }
+}
+
+function roundRect(
+  ctx: CanvasRenderingContext2D, 
+  x: number, 
+  y: number, 
+  width: number, 
+  height: number, 
+  radius: number
+) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + width - radius, y);
+  ctx.arcTo(x + width, y, x + width, y + radius, radius);
+  ctx.lineTo(x + width, y + height - radius);
+  ctx.arcTo(x + width, y + height, x + width - radius, y + height, radius);
+  ctx.lineTo(x + radius, y + height);
+  ctx.arcTo(x, y + height, x, y + height - radius, radius);
+  ctx.lineTo(x, y + radius);
+  ctx.arcTo(x, y, x + radius, y, radius);
+  ctx.closePath();
+}
+
+export async function renderTicketToCanvas(
+  data: TicketData, 
+  activeTab: 'yoshi' | 'chivas' = 'yoshi',
+  scale: number = 2
+): Promise<HTMLCanvasElement> {
+  await preloadTicketLogos();
+
+  const isChivas = activeTab === 'chivas';
+  const primaryColor = isChivas ? '#ee2e24' : COLORS.PRIMARY; // #fa005a
+
+  // Calculate layout dimensions precisely matching TicketPreview (390px base width)
+  const baseWidth = 390;
+  
+  // Dynamic header height calculation
+  const hasHeaderBadges = data.isTokens || data.cortesia;
+  const headerHeightBase = isChivas 
+    ? (hasHeaderBadges ? 150 : 110) 
+    : (hasHeaderBadges ? 130 : 95);
+
+  const hasSaldo = Boolean(data.saldo && data.saldo.trim() !== '');
+  const saldoBoxHBase = 64;
+  const saldoSectionHBase = hasSaldo ? (saldoBoxHBase + 24) : 10;
+
+  const hasValido = Boolean(data.valido && data.valido.trim() !== '');
+  const hasExtra = Boolean(data.showExtraData && data.extraData && data.extraData.trim() !== '');
+  const showLegend = !data.cortesia && !data.isTokens;
+
+  const baseHeight = headerHeightBase + saldoSectionHBase + 30 + 326 + 16 + (hasValido ? 36 : 0) + (hasExtra ? 44 : 0) + (showLegend ? 70 : 30);
+
+  const width = baseWidth * scale;
+  const height = baseHeight * scale;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Could not get 2d context');
+
+  // Background card (#F9FAFB)
+  roundRect(ctx, 0, 0, width, height, 35.2 * scale); // 2.2rem radius
+  ctx.fillStyle = '#F9FAFB';
+  ctx.fill();
+
+  // 1. Header (White background)
+  const headerHeight = headerHeightBase * scale;
+  ctx.fillStyle = '#FFFFFF';
+  
+  // Clip header top corners to match card top rounded border
+  ctx.save();
+  roundRect(ctx, 0, 0, width, headerHeight + 20 * scale, 35.2 * scale);
+  ctx.fill();
+  ctx.restore();
+
+  // Header bottom dashed border
+  ctx.save();
+  ctx.beginPath();
+  ctx.setLineDash([6 * scale, 6 * scale]);
+  ctx.moveTo(0, headerHeight);
+  ctx.lineTo(width, headerHeight);
+  ctx.strokeStyle = '#E5E7EB';
+  ctx.lineWidth = 1.5 * scale;
+  ctx.stroke();
+  ctx.restore();
+
+  // Draw Cutout Side Notches
+  const notchY = headerHeight;
+  const notchRadius = 16 * scale;
+  ctx.save();
+  ctx.fillStyle = '#F9FAFB';
+  // Left notch
+  ctx.beginPath();
+  ctx.arc(0, notchY, notchRadius, -Math.PI / 2, Math.PI / 2);
+  ctx.fill();
+  ctx.strokeStyle = '#E5E7EB';
+  ctx.lineWidth = 1 * scale;
+  ctx.stroke();
+
+  // Right notch
+  ctx.beginPath();
+  ctx.arc(width, notchY, notchRadius, Math.PI / 2, (3 * Math.PI) / 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  // Draw Header Logo
+  let badgeY = 0;
+  if (isChivas && chivasLogoImg) {
+    const logoH = 80 * scale;
+    const logoW = 80 * (371 / 336) * scale;
+    ctx.drawImage(chivasLogoImg, (width - logoW) / 2, 16 * scale, logoW, logoH);
+    badgeY = 16 * scale + logoH + 8 * scale;
+  } else if (!isChivas && fullLogoImg) {
+    const logoH = 51 * scale;
+    const logoW = 51 * (600 / 218) * scale;
+    ctx.drawImage(fullLogoImg, (width - logoW) / 2, 20 * scale, logoW, logoH);
+    badgeY = 20 * scale + logoH + 10 * scale;
+  }
+
+  // Header badges (Tokens / Cortesia)
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+
+  if (hasHeaderBadges) {
+    ctx.font = `900 ${22 * scale}px system-ui, -apple-system, sans-serif`;
+    ctx.fillStyle = primaryColor;
+    if ('letterSpacing' in ctx) {
+      (ctx as any).letterSpacing = `${22 * 0.3 * scale}px`;
+    }
+
+    if (data.isTokens) {
+      ctx.fillText('TOKENS', width / 2, badgeY);
+      badgeY += 26 * scale;
+    }
+    if (data.cortesia) {
+      ctx.fillText('CORTESIA', width / 2, badgeY);
+    }
+
+    if ('letterSpacing' in ctx) {
+      (ctx as any).letterSpacing = '0px';
+    }
+  }
+
+  // 2. Saldo / Valido por Box
+  let currentY = headerHeight + 24 * scale;
+  if (hasSaldo) {
+    const boxX = 32 * scale;
+    const boxW = width - boxX * 2; // 326 * scale
+    const boxH = saldoBoxHBase * scale;
+
+    // Draw box shadow
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.12)';
+    ctx.shadowBlur = 8 * scale;
+    ctx.shadowOffsetY = 3 * scale;
+    roundRect(ctx, boxX, currentY, boxW, boxH, 19.2 * scale); // 1.2rem
+    ctx.fillStyle = primaryColor;
+    ctx.fill();
+    ctx.restore();
+
+    // Box background pattern overlay
+    ctx.save();
+    roundRect(ctx, boxX, currentY, boxW, boxH, 19.2 * scale);
+    ctx.clip();
+    ctx.globalAlpha = 0.10;
+    
+    if (isChivas) {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `900 ${8 * scale}px system-ui, sans-serif`;
+      for (let px = boxX - 20 * scale; px < boxX + boxW + 20 * scale; px += 45 * scale) {
+        for (let py = currentY - 20 * scale; py < currentY + boxH + 20 * scale; py += 16 * scale) {
+          ctx.fillText('CHIVAS', px, py);
+        }
+      }
+    } else if (yoshiIconImg) {
+      const iconSize = 16 * scale;
+      for (let px = boxX; px < boxX + boxW; px += 28 * scale) {
+        for (let py = currentY; py < currentY + boxH; py += 28 * scale) {
+          ctx.drawImage(yoshiIconImg, px, py, iconSize, iconSize);
+        }
+      }
+    }
+    ctx.restore();
+
+    // Box Top Label
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.font = `700 ${9 * scale}px system-ui, -apple-system, sans-serif`;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    if ('letterSpacing' in ctx) {
+      (ctx as any).letterSpacing = `${9 * 0.2 * scale}px`;
+    }
+    const labelText = data.isTokens ? 'VÁLIDO PARA:' : 'SALDO DISPONIBLE';
+    ctx.fillText(labelText, width / 2, currentY + 12 * scale);
+
+    if ('letterSpacing' in ctx) {
+      (ctx as any).letterSpacing = '0px';
+    }
+
+    // Box Main Value Text
+    const valText = data.isTokens ? data.saldo : `$${data.saldo}`;
+    const fontStyle = data.isTokens ? 'italic 700' : '400';
+    const fontFam = data.isTokens ? 'Georgia, serif' : 'system-ui, -apple-system, sans-serif';
+    const fontSize = (data.saldo.length > 15 && !data.isTokens) ? 18 : (data.isTokens ? 24 : 34);
+    ctx.font = `${fontStyle} ${fontSize * scale}px ${fontFam}`;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(valText, width / 2, currentY + 26 * scale);
+
+    currentY += boxH + 18 * scale;
+  } else {
+    currentY += 10 * scale;
+  }
+
+  // 3. Instruction label
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.font = `500 ${18 * scale}px system-ui, -apple-system, sans-serif`;
+  ctx.fillStyle = '#9CA3AF'; // text-gray-400
+  const instructionText = isChivas 
+    ? 'Presenta este código para realizar tu canjee' 
+    : 'Presenta este código QR para pagar en el recinto';
+  ctx.fillText(instructionText, width / 2, currentY);
+
+  currentY += 28 * scale;
+
+  // 4. QR Code Container Box
+  const qrBoxX = 32 * scale;
+  const qrBoxW = width - qrBoxX * 2; // 326 * scale
+  const qrBoxH = qrBoxW; // aspect-square
+
+  // Draw QR white rounded card with shadow
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.08)';
+  ctx.shadowBlur = 12 * scale;
+  ctx.shadowOffsetY = 4 * scale;
+  roundRect(ctx, qrBoxX, currentY, qrBoxW, qrBoxH, 32 * scale); // rounded-[2rem]
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fill();
+  ctx.restore();
+
+  ctx.lineWidth = 1.5 * scale;
+  ctx.strokeStyle = '#F3F4F6'; // border-gray-100
+  ctx.stroke();
+
+  // Chivas shield watermark inside QR box
+  if (isChivas && chivasShieldImg) {
+    ctx.save();
+    roundRect(ctx, qrBoxX, currentY, qrBoxW, qrBoxH, 32 * scale);
+    ctx.clip();
+    ctx.globalAlpha = 0.08;
+    const shieldW = qrBoxW * 1.1;
+    const shieldH = shieldW;
+    ctx.translate(qrBoxX + qrBoxW / 2, currentY + qrBoxH / 2);
+    ctx.rotate((12 * Math.PI) / 180);
+    ctx.drawImage(chivasShieldImg, -shieldW / 2, -shieldH / 2, shieldW, shieldH);
+    ctx.restore();
+  }
+
+  // Draw QR Code
+  const qrValue = data.codigo || (isChivas ? 'chivas' : 'yoshi');
+  const qrFgColor = isChivas ? '#002b5c' : '#000000';
+  const qrSize = 265 * scale;
+  const qrPadding = (qrBoxW - qrSize) / 2;
+
+  const tempQrCanvas = document.createElement('canvas');
+  await QRCode.toCanvas(tempQrCanvas, qrValue, {
+    width: qrSize,
+    margin: 0,
+    errorCorrectionLevel: 'H',
+    color: {
+      dark: qrFgColor,
+      light: '#00000000'
+    }
+  });
+
+  ctx.drawImage(tempQrCanvas, qrBoxX + qrPadding, currentY + qrPadding, qrSize, qrSize);
+
+  currentY += qrBoxH + 16 * scale;
+
+  // 5. Valido en recinto badge
+  if (hasValido) {
+    const textPart1 = 'VALIDO EN RECINTO: ';
+    const textPart2 = data.valido.toUpperCase();
+
+    ctx.font = `700 ${14 * scale}px system-ui, -apple-system, sans-serif`;
+    const w1 = ctx.measureText(textPart1).width;
+    const w2 = ctx.measureText(textPart2).width;
+    const totalW = w1 + w2;
+
+    // Draw background pill
+    const pillPaddingX = 12 * scale;
+    const pillH = 26 * scale;
+    const pillW = totalW + pillPaddingX * 2;
+    const pillX = (width - pillW) / 2;
+
+    roundRect(ctx, pillX, currentY, pillW, pillH, 6 * scale);
+    ctx.fillStyle = 'rgba(243, 244, 246, 0.6)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(243, 244, 246, 0.9)';
+    ctx.lineWidth = 1 * scale;
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const textY = currentY + pillH / 2;
+    ctx.fillStyle = '#374151'; // text-gray-700
+    ctx.fillText(textPart1, pillX + pillPaddingX, textY);
+
+    ctx.fillStyle = primaryColor;
+    ctx.fillText(textPart2, pillX + pillPaddingX + w1, textY);
+
+    currentY += pillH + 16 * scale;
+  }
+
+  // 6. Extra Data
+  if (hasExtra) {
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.font = `900 italic ${22 * scale}px system-ui, -apple-system, sans-serif`;
+    ctx.fillStyle = 'rgba(55, 65, 81, 0.8)'; // text-gray-700 opacity-80
+    ctx.fillText(data.extraData.toUpperCase(), width / 2, currentY);
+    currentY += 32 * scale;
+  }
+
+  // 7. Legend
+  if (showLegend) {
+    const legendY = height - 52 * scale;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.setLineDash([4 * scale, 4 * scale]);
+    ctx.moveTo(32 * scale, legendY - 12 * scale);
+    ctx.lineTo(width - 32 * scale, legendY - 12 * scale);
+    ctx.strokeStyle = 'rgba(229, 231, 235, 0.6)';
+    ctx.lineWidth = 1 * scale;
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.font = `500 ${19 * scale}px system-ui, -apple-system, sans-serif`;
+    ctx.fillStyle = '#9CA3AF'; // text-gray-400
+    ctx.fillText('Solicita tu saldo remanente desde', width / 2, legendY);
+
+    ctx.font = `400 ${18 * scale}px system-ui, -apple-system, sans-serif`;
+    ctx.fillStyle = primaryColor;
+    if ('letterSpacing' in ctx) {
+      (ctx as any).letterSpacing = `${18 * 0.1 * scale}px`;
+    }
+    ctx.fillText('yoshicash.com/refunds', width / 2, legendY + 22 * scale);
+    if ('letterSpacing' in ctx) {
+      (ctx as any).letterSpacing = '0px';
+    }
+  }
+
+  return canvas;
+}
