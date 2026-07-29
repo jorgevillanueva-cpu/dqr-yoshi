@@ -87,8 +87,9 @@ export async function renderTicketToCanvas(
   const hasValido = Boolean(data.valido && data.valido.trim() !== '');
   const hasExtra = Boolean(data.showExtraData && data.extraData && data.extraData.trim() !== '');
   const showLegend = !data.cortesia && !data.isTokens;
+  const instructionHBase = 56; // 2 lines at ~22px height + 12px margin
 
-  const baseHeight = headerHeightBase + saldoSectionHBase + 30 + 326 + 16 + (hasValido ? 36 : 0) + (hasExtra ? 44 : 0) + (showLegend ? 70 : 30);
+  const baseHeight = headerHeightBase + saldoSectionHBase + instructionHBase + 326 + 16 + (hasValido ? 36 : 0) + (hasExtra ? 44 : 0) + (showLegend ? 70 : 30);
 
   const width = baseWidth * scale;
   const height = baseHeight * scale;
@@ -253,17 +254,21 @@ export async function renderTicketToCanvas(
     currentY += 10 * scale;
   }
 
-  // 3. Instruction label
+  // 3. Instruction label (2 lines matching preview max-width & line wrapping)
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.font = `500 ${18 * scale}px system-ui, -apple-system, sans-serif`;
   ctx.fillStyle = '#9CA3AF'; // text-gray-400
-  const instructionText = isChivas 
-    ? 'Presenta este código para realizar tu canjee' 
-    : 'Presenta este código QR para pagar en el recinto';
-  ctx.fillText(instructionText, width / 2, currentY);
+  const instructionLines = isChivas 
+    ? ['Presenta este código para', 'realizar tu canjee']
+    : ['Presenta este código QR para', 'pagar en el recinto'];
+  
+  const instructionLineHeight = 22 * scale;
+  for (let l = 0; l < instructionLines.length; l++) {
+    ctx.fillText(instructionLines[l], width / 2, currentY + l * instructionLineHeight);
+  }
 
-  currentY += 28 * scale;
+  currentY += (instructionLines.length * instructionLineHeight) + (12 * scale);
 
   // 4. QR Code Container Box
   const qrBoxX = 32 * scale;

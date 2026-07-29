@@ -22,13 +22,17 @@ const initialFormData: TicketData = {
 
 const getEffectiveTicket = (ticket: TicketData, globalForm: TicketData, tab: 'yoshi' | 'chivas'): TicketData => {
   const isTokens = tab === 'chivas' || (tab === 'yoshi' && ticket.isTokens);
+  const ticketHasExtra = Boolean(ticket.extraData && ticket.extraData.trim() !== '');
+  const extraData = ticketHasExtra ? ticket.extraData : (globalForm.showExtraData ? globalForm.extraData : '');
+  const showExtraData = ticketHasExtra || ticket.showExtraData || (globalForm.showExtraData && Boolean(globalForm.extraData && globalForm.extraData.trim() !== ''));
+
   return {
     ...ticket,
-    valido: globalForm.valido || ticket.valido,
-    saldo: isTokens ? (globalForm.saldo || ticket.saldo) : ticket.saldo,
-    cortesia: globalForm.cortesia || ticket.cortesia,
-    showExtraData: globalForm.showExtraData || ticket.showExtraData,
-    extraData: globalForm.showExtraData ? (globalForm.extraData || ticket.extraData) : ticket.extraData,
+    valido: ticket.valido || globalForm.valido,
+    saldo: isTokens ? (ticket.saldo || globalForm.saldo) : ticket.saldo,
+    cortesia: ticket.cortesia || globalForm.cortesia,
+    showExtraData: showExtraData,
+    extraData: extraData,
   };
 };
 
@@ -222,7 +226,12 @@ const App: React.FC = () => {
       const codigoKey = findKey('Código', 'Codigo', 'Code', 'ID', 'Ticket', 'Folio');
       const saldoKey = findKey('Saldo', 'Balance');
       const tipoKey = findKey('Tipo');
-      const extraKey = findKey('Comentario', 'Comment', 'Personalizar');
+      const extraKey = findKey(
+        'Comentario', 'Comentarios', 'Comment', 'Comments', 
+        'Personalizar', 'Personalización', 'Personalizacion', 
+        'Extra', 'Notas', 'Nota', 'Leyenda', 'Detalle', 
+        'Observaciones', 'Observacion'
+      );
 
       const tickets: TicketData[] = new Array(data.length);
       for (let i = 0; i < data.length; i++) {
@@ -245,14 +254,17 @@ const App: React.FC = () => {
           codigo = codigo.toLowerCase();
         }
 
+        const rowExtra = extraKey && row[extraKey] !== undefined && row[extraKey] !== null ? row[extraKey].toString().trim() : '';
+        const hasRowExtra = rowExtra !== '';
+
         tickets[i] = {
           ...initialFormData,
           codigo: codigo,
-          saldo: (saldoKey && row[saldoKey] ? row[saldoKey].toString() : '') || formData.saldo,
+          saldo: (saldoKey && row[saldoKey] !== undefined && row[saldoKey] !== null ? row[saldoKey].toString().trim() : '') || formData.saldo,
           valido: formData.valido,
           cortesia: isCortesia,
-          showExtraData: isCortesia,
-          extraData: extraKey && row[extraKey] ? row[extraKey].toString() : '',
+          showExtraData: isCortesia || hasRowExtra,
+          extraData: rowExtra,
           isTokens: isTokens
         };
       }
